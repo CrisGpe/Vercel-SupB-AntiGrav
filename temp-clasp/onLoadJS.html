@@ -1,0 +1,517 @@
+<script>
+/**
+ * ==========================================================================
+ * MÓDULO PRINCIPAL DE CONTROL (onLoadJS) - VERSIÓN UNIFICADA Y SEGURA
+ * ==========================================================================
+ * Este archivo centraliza la orquestación de la UI, el sondeo de datos
+ * y la comunicación con Google Apps Script.
+ */
+
+// Estado global para el filtrado de Órdenes de Atención (OATC)
+window.filtroOATCActivo = 'Pendientes'; 
+
+(function() {
+    // --- CONFIGURACIÓN DE CONSTANTES ---
+    const AGENDA_PREVIEW_URL = "https://docs.google.com/document/d/1sOB4RpJ28zSda-vqo1VSXCw_ixMbVNm9qst6qZUUAac/preview";
+    const INTERVALO_SONDEO = 60000; // 60 segundos para actualización silenciosa
+
+    document.addEventListener("DOMContentLoaded", () => {
+      console.log("DEBUG(Cliente): DOM Cargado. Iniciando carga de datos maestros...");
+      
+      // Activamos el overlay de carga inmediatamente
+      mostrarCargando(); 
+      
+      // Delegamos la carga de datos maestros de forma secuencial y segura
+      setTimeout(loadLoads, 1500);
+
+      /**
+       * --- B. REGISTRO DE EVENTOS PARA BOTONES ESTÁTICOS ---
+       * Se utiliza un mapeo para facilitar el mantenimiento.
+       */
+      const btnMap = {
+        // Gestión de Estados de Agentes
+        "btnActivarFicha": activarFicha,
+        "btnDesactivarFicha": desctivarFicha,
+        "btnRefrigerioFicha": refrigerioFicha,
+        "btnPsicologo": psicologoFicha,
+        "btnPasVoz": pasarVozFicha,
+        "btnSalioSalon": salioSalonFicha,
+        "btnPasarSalon": pasarSalonFicha,
+        
+        // Filtros Visuales de Agentes (Activan Spinner)
+        "btnFiltrarView": () => { mostrarCargando(); window.filtrarView(); },
+        "btnFiltrarViewEstilismo": () => { mostrarCargando(); window.filtrarViewEstilismo(); },
+        "btnFiltrarViewCosmiatria": () => { mostrarCargando(); window.filtrarViewCosmiatria(); },
+        "btnFiltrarViewOtros": () => { mostrarCargando(); window.filtrarViewOtros(); },
+        
+        // Gestión de Órdenes (OATC)
+        "btnRegistrarOATC": activarRegistrarOATC,
+        "btnFiltrarViewCitasHoy": () => {
+            mostrarCargando();
+            google.script.run
+              .withSuccessHandler(citas => {
+                ocultarCargando();
+                const tbody = document.getElementById('bodyGestionCitas');
+                tbody.innerHTML = '';
+
+                if (citas.length === 0) {
+                  tbody.innerHTML = '<tr><td colspan="5" class="text-center">No hay citas próximas.</td></tr>';
+                } else {
+                    tbody.innerHTML = ''; // Limpiar antes de llenar
+                    citas.forEach((cita) => {
+                        tbody.innerHTML += `
+                        <tr>
+                          <td>
+                              <div class="small fw-bold">${cita[5]}</div>
+                              <div class="small text-muted">${cita[1]}</div>
+                          </td>
+                          
+                          <td>${cita[2]}</td>
+                          
+                          <td><span class="badge bg-info text-dark">${cita[3]}</span></td>
+                          
+                          <td>${cita[4]}</td>
+                          
+                          <td class="text-center">
+                              <button class="btn btn-sm btn-outline-primary" onclick="window.editarCita(${cita[0]})">
+                                  <i class="fas fa-edit"></i>
+                              </button>
+                              <button class="btn btn-sm btn-outline-danger" onclick="window.eliminarCita(${cita[0]})">
+                                  <i class="fas fa-trash"></i>
+                              </button>
+                          </td>
+                        </tr>`;
+                  });
+                }
+                const modal = new bootstrap.Modal(document.getElementById('modalListadoCitas'));
+                modal.show();
+              })
+              .obtenerCitasRegistradasEnAdelante();
+          },
+        "btnFiltrarViewPendientes": () => { mostrarCargando(); window.filtrarViewOATCPendientes(); },
+        "btnFiltrarViewTodas": () => { mostrarCargando(); window.filtrarViewTodas(); },
+        
+        // Registro y Utilidades
+        "btnRegistrarCita": abrirModalCita,
+        "btnRegistrarCliente": abrirModalCliente,
+        "btnCerrar": cerrarSistema,
+        "btnAgendaHoy": () => mostrarAgendaDelMesEnModal()
+      };
+
+      // Inyección masiva de listeners con validación de existencia
+      Object.keys(btnMap).forEach(id => {
+        const elemento = document.getElementById(id);
+        if (elemento) {
+          elemento.addEventListener("click", btnMap[id]);
+        }
+      });
+
+      // Manejo de cierre de modales nativos al hacer clic fuera
+      window.onclick = function(event) {
+        const modalAgenda = document.getElementById('agendaModal');
+        if (modalAgenda && event.target == modalAgenda) {
+          const inst = bootstrap.Modal.getInstance(modalAgenda);
+          if (inst) inst.hide();
+        }
+      };
+        
+      /**
+       * --- C. DELEGACIÓN DE EVENTOS PARA ELEMENTOS DINÁMICOS ---
+       * Fundamental para botones generados por DataTables.
+       */
+      document.addEventListener('click', function(e) {
+        let target = e.target.closest('button, .eliminarOATC, .resolverOATC, .terminarATCBtn, .activarAsesoriaOATC, .reiniciarOATC, .clickeable-cliente');
+        if (!target) return;
+
+        // Grupo 1: Ediciones y Modales (NO activan spinner global aquí, el modal lo maneja)
+        if (target.matches(".asignarActivarModalBtn, .editarClienteOATC, .clickeable-cliente, .editarTipoAtencionOATC, .ponerEnEsperaOATC, .btnAbrirNotasOATC, .btnEnviarCaja, .eliminarOATC")) { 
+          if (window.handleOATCMultiClick) {
+            window.handleOATCMultiClick(e);
+          }
+        } 
+        
+        // Grupo 2: Acciones Directas (Van a pedir confirmación Swal)
+        else if (target.matches(".resolverOATC, .terminarATCBtn, .activarAsesoriaOATC, .reiniciarOATC")) {
+          // IMPORTANTE: Quitamos el mostrarCargando() de aquí.
+          // El spinner lo activará gestionOrdenesATCJS solo CUANDO el usuario diga "SÍ" en el Swal.
+          if (window.handleOATCButtonClick) {
+            window.handleOATCButtonClick(e);
+          }
+        }
+      });
+    });
+
+    /**
+     * MODULO DE SEGURIDAD SPA (SIN REDIRECCIONES DE BARRA DE DIRECCION)
+     */
+    function intentarDesbloquearSPA(event) {
+      if (event) event.preventDefault();
+      
+      const user = document.getElementById("lockUsername").value.trim();
+      const pass = document.getElementById("lockPassword").value.trim();
+      const spinner = document.getElementById("lockSpinner");
+
+      console.log("DEBUG SPA: Intentando autenticar usuario:", user);
+      spinner.style.display = "flex";
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          console.log("DEBUG SPA: Respuesta de autenticarUsuario:", res);
+          spinner.style.display = "none";
+          
+          if (res && res.success) {
+            // Guardar datos en el localStorage local
+            localStorage.setItem("user_token", res.token);
+            localStorage.setItem("user_role", res.rol);
+            localStorage.setItem("user_name", res.nombre);
+
+            Swal.fire({
+              icon: 'success',
+              title: '¡Acceso Concedido!',
+              text: `Bienvenido(a), ${res.nombre}.`,
+              timer: 1500,
+              showConfirmButton: false
+            }).then(() => {
+              // Desbloqueo directo e inmediato por JavaScript (Cero redirecciones conflictivas)
+              desbloquearIUConSesion(res.rol);
+            });
+          } else {
+            Swal.fire({
+              icon: 'error',
+              title: 'Credenciales Incorrectas',
+              text: res.message || 'Verifique sus datos e intente nuevamente.'
+            });
+          }
+        })
+        .withFailureHandler(function(err) {
+          spinner.style.display = "none";
+          Swal.fire({
+            icon: 'error',
+            title: 'Error del Servidor',
+            text: err.message || 'No se pudo comunicar con el validador.'
+          });
+        })
+        .autenticarUsuario(user, pass);
+    }
+
+    function desbloquearIUConSesion(rol) {
+      console.log("DEBUG SPA: Desbloqueando interfaz para rol:", rol);
+      
+      // Ocultar pantalla de bloqueo de forma instantánea
+      document.getElementById("pantallaBloqueo").style.display = "none";
+
+      if (rol === 'desarrollador') {
+        // Mostrar Panel de desarrollador y ocultar Dashboard
+        document.getElementById("displayDevLayout").style.display = "block";
+        document.getElementById("displayLayout").style.display = "none";
+        console.log("DEBUG SPA: Cargando Panel del Desarrollador...");
+      } else if (rol === 'recepcion' || rol === 'administrador') {
+        // Mostrar Dashboard y ocultar Panel de desarrollador
+        document.getElementById("displayLayout").style.display = "block";
+        document.getElementById("displayDevLayout").style.display = "none";
+        
+        // Disparar la carga asíncrona de datos del Dashboard de manera ordenada
+        mostrarCargando();
+        setTimeout(loadLoads, 100);
+        console.log("DEBUG SPA: Cargando Dashboard de Recepción...");
+      } else {
+        console.error("DEBUG SPA: Rol desconocido detectado:", rol);
+        localStorage.clear();
+        document.getElementById("pantallaBloqueo").style.display = "flex";
+      }
+    }
+
+    // Sobrescribir el botón de "Cerrar" del Dashboard y "Cerrar Sesión" del Panel
+    function cerrarSistema() {
+      console.log("DEBUG SPA: Cerrando sesión de usuario...");
+      localStorage.clear();
+      
+      // Ocultar paneles y mostrar la pantalla de bloqueo al instante
+      document.getElementById("displayLayout").style.display = "none";
+      document.getElementById("displayDevLayout").style.display = "none";
+      
+      // Limpiar inputs del login
+      document.getElementById("lockUsername").value = "";
+      document.getElementById("lockPassword").value = "";
+      
+      document.getElementById("pantallaBloqueo").style.display = "flex";
+    }
+    
+    /**
+     * --- D. SISTEMA DE FEEDBACK VISUAL (SPINNER) ---
+     * Centralizado para asegurar que ningún proceso deje la pantalla bloqueada.
+     */
+    function mostrarCargando() {
+      const overlay = document.getElementById('loading-overlay');
+      if (overlay) {
+        // Usamos setProperty para asegurar que el 'important' del CSS se respete
+        overlay.style.setProperty('display', 'flex', 'important');
+        overlay.style.pointerEvents = 'all'; // Bloquea clics
+      }
+    }
+
+    function ocultarCargando() {
+      const overlay = document.getElementById('loading-overlay');
+      if (overlay) {
+        overlay.style.display = 'none';
+        overlay.style.pointerEvents = 'none'; // Libera clics
+      }
+    }
+
+    /**
+     * --- E. CARGA DE DATOS MAESTROS ---
+     * Sincroniza las listas desplegables y prepara las tablas iniciales.
+     */
+    function loadLoads() {
+      console.log("DEBUG(Servidor): Iniciando migración de datos de hoy de forma secuencial y segura...");
+      
+      // En lugar de llamar concurrentemente a todos los endpoints de google.script.run
+      // (lo cual colapsa el canal de postMessage y causa 'posting uri is not valid' en ciertos entornos/proxies),
+      // los llamaremos de forma ordenada y secuencial con pequeños retardos.
+
+      setTimeout(() => {
+        console.log("DEBUG: Cargando lista de agentes...");
+        loadInfoDataList();
+      }, 100);
+
+      setTimeout(() => {
+        console.log("DEBUG: Cargando lista de clientes...");
+        loadInfoDataListClientes();
+      }, 500);
+
+      setTimeout(() => {
+        console.log("DEBUG: Cargando agentes activos...");
+        loadInfoDataListAgentesActivos();
+      }, 900);
+
+      setTimeout(() => {
+        console.log("DEBUG: Cargando productos...");
+        if (window.cargarListaProductosVenta) window.cargarListaProductosVenta();
+        ajustarFechaAlCargar();
+      }, 1300);
+
+      setTimeout(() => {
+        console.log("DEBUG: Cargando siguiente número de orden y migrando citas de hoy...");
+        obtenerSiguienteNumeroOATC();
+
+        google.script.run
+          .withSuccessHandler(function(respuesta) {
+            console.log("DEBUG: Migración de citas completada exitosamente.");
+            
+            // Renderizado inicial de tablas
+            if (typeof window.filtrarView === 'function') window.filtrarView();
+            
+            if (typeof window.filtrarViewOATCPendientes === 'function') {
+              window.filtroOATCActivo = 'Pendientes';
+              window.filtrarViewOATCPendientes();
+            }
+            
+            // Activación del ciclo de vida de actualización automática
+            iniciarSondeoDeDatos(); 
+            
+            // Liberación de la interfaz
+            ocultarCargando();
+          })
+          .withFailureHandler(err => { 
+            ocultarCargando(); 
+            window.onFailureConexion(err); 
+          })
+          .migrarCitasDeHoy();
+      }, 1700);
+    }
+
+    /**
+     * --- F. SISTEMA DE ACTUALIZACIÓN EN TIEMPO REAL (POLLING) ---
+     * Corregido para inyectar datos y forzar renderizado sin nuevas peticiones.
+     */
+    function iniciarSondeoDeDatos() {
+      console.log(`[SISTEMA] Polling activado: cada ${INTERVALO_SONDEO / 1000}s`);
+      
+      setInterval(function() {
+        // 1. Verificación de UI: No interrumpir si el usuario tiene modales abiertos
+        const modalAbierto = document.querySelector('.modal.show');
+        const swalAbierto = document.querySelector('.swal2-container');
+
+        if (!modalAbierto && !swalAbierto) {
+          console.log("[POLLING] Ejecutando sincronización silenciosa...");
+          
+          google.script.run
+            .withSuccessHandler(res => {
+                if (res && res.success) {
+                  // A. Actualizar Agentes (Disponibilidad y Turnos)
+                  if (window.renderizarTablaAgentes && res.agentes) {
+                    // Usamos la función de renderizado directo en lugar de la de filtrado
+                    window.renderizarTablaAgentes(res.agentes);
+                  } else if (window.filtrarView) {
+                    // Fallback: refresco silencioso
+                    window.filtrarView(true); 
+                  }
+                  
+                  // B. Actualizar Órdenes (OATC)
+                  if (window.filtroOATCActivo === 'Pendientes' && res.oatc) {
+                    if (window.renderizarTablaOATC) {
+                      window.renderizarTablaOATC(res.oatc); // Inyectamos datos directo al motor
+                    } else if (window.filtrarViewOATCPendientes) {
+                      window.filtrarViewOATCPendientes(true);
+                    }
+                  }
+                  
+                  console.log("[POLLING] Tablas sincronizadas.");
+                }
+              })
+            .dispararSondeoSilencioso(); 
+        }
+
+        // 2. Sincronización proactiva del ID de Orden
+        google.script.run
+          .withSuccessHandler(id => {
+            const campoId = document.getElementById('floatingInputNumeroOATC');
+            const clienteInput = document.getElementById('clientesDatalistOATC');
+            
+            // Solo actualizamos si el campo está vacío o el usuario no está escribiendo
+            if (campoId && id && id !== "Error" && (!clienteInput || clienteInput.value === "")) {
+                if (campoId.value !== id) {
+                  campoId.value = id;
+                  console.log("[POLLING] Nuevo ID detectado: " + id);
+                }
+            }
+          })
+          .obtenerNumeroLastOATC(); 
+
+      }, INTERVALO_SONDEO); 
+    }
+
+    /**
+     * --- G. UTILIDADES DE CARGA Y FORMATO ---
+     */
+    function ajustarFechaAlCargar() {
+      const today = new Date();
+      const dia = String(today.getDate()).padStart(2, '0');
+      const mes = String(today.getMonth() + 1).padStart(2, '0');
+      const fecha = `${dia}/${mes}/${today.getFullYear()}`;
+      
+      const input = document.getElementById('datePicker');
+      if (input) input.value = fecha;
+    }
+
+    // Cargadores específicos de DataLists
+    function loadInfoDataList() { 
+      google.script.run.withSuccessHandler(cargarDataList).obtenerListaAgentes(); 
+    }
+    
+    function cargarDataList(lista) {
+      const dl = document.getElementById("datalistAgentes");
+      if (dl) {
+        dl.innerHTML = (lista || []).map(a => `<option value="${a.apodo}">${a.especialidad}</option>`).join('');
+      }
+    }
+
+    function loadInfoDataListClientes() { 
+      google.script.run.withSuccessHandler(loadClientesDataList).obtenerListaClientes(); 
+    }
+    
+    function loadClientesDataList(lista) {
+      const dl = document.getElementById("datalistClientes");
+      if (dl && lista) {
+        dl.innerHTML = lista.map(c => 
+          `<option value="${c[0]} ${c[1]} | DNI:${c[2]} | CEL:${c[4]}">`
+        ).join('');
+      }
+    }
+
+    function loadInfoDataListAgentesActivos() { 
+      google.script.run.withSuccessHandler(loadAgentesADataList).obtenerListaAgentesA(); 
+    }
+    
+    function loadAgentesADataList(lista) {
+      const dl = document.getElementById("datalistAgentesA");
+      if (dl) {
+        dl.innerHTML = (lista || []).map(a => `<option value="${a.apodo}">${a.especialidad}</option>`).join('');
+      }
+    }
+
+    // --- MANEJO DE IDENTIFICADORES DE ORDEN ---
+    function obtenerSiguienteNumeroOATC() { 
+      google.script.run.withSuccessHandler(colocarSigNumOATC).obtenerNumeroLastOATC(); 
+    }
+    
+    function colocarSigNumOATC(n) { 
+      const i = document.getElementById("floatingInputNumeroOATC"); 
+      if (i) i.value = n; 
+    }
+    
+    function actualizarCampoID(n) { 
+      const i = document.getElementById("floatingInputNumeroOATC"); 
+      if (i) i.value = n; 
+    }
+
+    /**
+     * --- H. GESTIÓN DE ERRORES Y COMUNICACIÓN ---
+     */
+    function onFailureConexion(error) {
+      ocultarCargando();
+      console.error("CRÍTICO: Error de red o servidor:", error);
+      
+      // Uso de SweetAlert2 si está disponible, de lo contrario alert normal
+      if (window.Swal) {
+          Swal.fire({
+              icon: 'error',
+              title: 'Conexión Inestable',
+              text: 'No se pudo comunicar con el servidor de Google Sheets.',
+              footer: error.message || 'Revisar conexión a internet'
+          });
+      } else {
+          alert("❌ Error del Servidor: " + (error.message || "Fallo en la conexión."));
+      }
+    }
+
+    /**
+     * Refresco de UI optimizado y Sincronización de DataLists
+     */
+    function actualizarVistasPostAccion(respuesta, esSilencioso = false) {
+      // 1. Refrescar Tablas (Visual)
+      if (window.filtrarViewOATCPendientes) window.filtrarViewOATCPendientes(esSilencioso);
+      if (window.filtrarView) window.filtrarView(esSilencioso);
+
+      // 2. Sincronizar DataLists (Inputs del Formulario)
+      // Actualiza Agentes Disponibles
+      if (window.loadInfoDataListAgentesActivos) window.loadInfoDataListAgentesActivos();
+      
+      // Actualiza Lista Maestra de Clientes (NUEVO)
+      if (window.loadInfoDataListClientes) {
+        console.log("DEBUG: Sincronizando datalist de clientes...");
+        window.loadInfoDataListClientes();
+      }
+
+      // 3. Feedback al usuario
+      if (!esSilencioso) {
+        ocultarCargando();
+        if (typeof respuesta === 'string' && respuesta !== "") {
+          Swal.fire({ icon: 'success', title: 'Éxito', text: respuesta, timer: 1500, showConfirmButton: false });
+        }
+      }
+    }
+
+    /**
+     * --- J. EXPOSICIÓN AL OBJETO WINDOW ---
+     * Garantiza que las funciones sean accesibles desde modales y el servidor.
+     */
+    window.onFailureConexion = onFailureConexion;
+    window.actualizarVistasPostAccion = actualizarVistasPostAccion;
+    window.loadInfoDataListAgentesActivos = loadInfoDataListAgentesActivos;
+    
+    // Funciones del Flujo SPA
+    window.intentarDesbloquearSPA = intentarDesbloquearSPA;
+    window.desbloquearIUConSesion = desbloquearIUConSesion;
+    window.cerrarSistema = cerrarSistema;
+    
+    // Alias para compatibilidad con otros archivos (Modales)
+    window.ocultarCargando = ocultarCargando; 
+    window.mostrarCargando = mostrarCargando;
+    window.ocultarSpinner = ocultarCargando; 
+    window.mostrarSpinner = mostrarCargando;
+    
+    window.loadLoads = loadLoads;
+
+})(); // FIN DEL IIFE
+</script>

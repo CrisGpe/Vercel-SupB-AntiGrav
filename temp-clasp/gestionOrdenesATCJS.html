@@ -1,0 +1,248 @@
+<script>
+/**
+ * --- GESTIÓN DE ÓRDENES ATC ---
+ * Archivo: gestionOrdenesATCJS.html
+ */
+
+(function() {
+
+  function handleOATCButtonClick(e) {
+    const target = e.target.closest('button, .eliminarOATC'); // Asegura capturar el botón aunque se pulse el icono
+    if (!target) return;
+
+    const row = target.closest('tr');
+    if (!row) return;
+
+    // --- MEJORA CRÍTICA: Uso de Data Attributes ---
+    // En lugar de limpiar texto con Regex, usamos el ID que inyectamos en el renderizado
+    const oatcIdLimpio = target.getAttribute('data-oatc-id');
+    const agenteNombre = row.querySelector(".ordenesATCAgente")?.textContent?.trim() || "";
+
+    /**
+     * Helper interno para ejecutar acciones con el servidor
+     */
+    const ejecutarAccionServidor = (nombreFuncion, ...args) => {
+        // NOTA: El spinner YA fue activado por el listener global en onLoadJS
+        // Solo nos preocupamos por la comunicación con el servidor.
+
+        google.script.run
+          .withSuccessHandler(res => {
+              console.log(`Acción ${nombreFuncion} completada.`);
+              window.actualizarVistasPostAccion(res);
+          })
+          .withFailureHandler(err => {
+              window.onFailureConexion(err);
+              if (window.ocultarCargando) window.ocultarCargando();
+          })[nombreFuncion](...args);
+    };
+
+    // --- LÓGICA DE BOTONES ---
+
+    if (target.matches(".resolverOATC")) {
+        validarYEjecutar(oatcIdLimpio, () => {
+            ejecutarAccionServidor("resolverOATC", oatcIdLimpio, agenteNombre);
+        }, "¿Desea marcar como RESUELTA esta orden?");
+    }
+    
+    else if (target.matches(".activarAsesoriaOATC")) {
+        validarYEjecutar(oatcIdLimpio, () => {
+            ejecutarAccionServidor("convertirYActivarAsesoria", oatcIdLimpio, agenteNombre);
+        }, "¿Activar Asesoría para esta orden?");
+    }
+    
+    else if (target.matches(".terminarATCBtn")) {
+        validarYEjecutar(oatcIdLimpio, () => {
+            ejecutarAccionServidor("terminarATC", oatcIdLimpio, agenteNombre);
+        }, "¿Confirmar la FINALIZACIÓN de la atención?");
+    }
+    
+    else if (target.matches(".reiniciarOATC")) {
+      // Si el reinicio usa ID, mejor usar oatcIdLimpio. 
+      // Si obligatoriamente usa rowIndex, lo mantenemos:
+      const rowIndex = row.rowIndex - 1; 
+      Swal.fire({
+          title: "¿Reiniciar registro?",
+          text: "Esta acción restablecerá los tiempos de la orden.",
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Sí, reiniciar'
+      }).then((result) => {
+          if (result.isConfirmed) {
+              // Si el spinner se ocultó por el Swal, lo reactivamos antes de llamar al servidor
+              if (window.mostrarCargando) window.mostrarCargando();
+              ejecutarAccionServidor("reiniciarOATC", rowIndex);
+          } else {
+              // Si cancela, quitamos el spinner que puso el clic inicial
+              if (window.ocultarCargando) window.ocultarCargando();
+          }
+      });
+    }
+    
+    else if (target.matches(".eliminarOATC")) {
+      // El spinner se evita aquí porque en onLoadJS movimos .eliminarOATC al Grupo 1
+      if (oatcIdLimpio && window.abrirModalEliminarOATC) {
+          window.abrirModalEliminarOATC(oatcIdLimpio);
+      }
+    }
+  }
+
+  function validarYEjecutar(id, callback, mensaje = null) {
+    if (!id) { 
+      if (window.ocultarCargando) window.ocultarCargando();
+      Swal.fire('Error', 'No se detectó el ID de la orden', 'error'); 
+      return; 
+    }
+
+    if (mensaje) {
+      Swal.fire({ 
+        title: mensaje, 
+        icon: 'question', 
+        showCancelButton: true,
+        confirmButtonText: 'Confirmar',
+        cancelButtonText: 'Cancelar'
+      }).then(r => { 
+        if(r.isConfirmed) {
+          if (window.mostrarCargando) window.mostrarCargando(); // Reactivar tras el confirm
+          callback(); 
+        } else {
+          if (window.ocultarCargando) window.ocultarCargando(); // Limpiar si cancela
+        }
+      });
+    } else { 
+      callback(); 
+    }
+  }
+
+  /**
+   * REVISADA: Soporta parámetro esSilencioso para evitar bloquear la UI
+   */
+  function actualizarVistasPostAccion(respuesta, esSilencioso = false) {
+    if (!esSilencioso) window.ocultarSpinner();
+
+    // Refresco de tablas pasando el flag de silencio
+    if (window.filtrarView) window.filtrarView(esSilencioso);
+    
+    if (window.filtroOATCActivo === 'Pendientes' && window.filtrarViewOATCPendientes) {
+      window.filtrarViewOATCPendientes(esSilencioso);
+    } else if (window.filtroOATCActivo === 'Citas' && window.filtrarViewCitasRegistradas) {
+      window.filtrarViewCitasRegistradas(esSilencioso);
+    }
+
+    if (window.loadInfoDataListAgentesActivos) window.loadInfoDataListAgentesActivos();
+
+    if (!esSilencioso && typeof respuesta === 'string') {
+      Swal.fire({ title: 'Éxito', text: respuesta, icon: 'success', timer: 1500, showConfirmButton: false });
+    }
+  }
+
+  function activarRegistrarOATC() {
+    const formulario = document.getElementById('formOATC');
+
+    // 1. Validación de UI nativa (campos que aún son 'required')
+    if (!formulario.checkValidity()) {
+      formulario.reportValidity();
+      return;
+    }
+
+    // 2. Captura inicial de datos
+    const OATCform = {
+      numeroOATC: document.getElementById('floatingInputNumeroOATC')?.value,
+      fechaOATC: document.getElementById('datePicker')?.value,
+      nombreClienteOATC: document.getElementById('clientesDatalistOATC')?.value.trim(), // Limpiamos espacios
+      tipoClienteOATC: document.getElementById('tipoClientesDatalist')?.value,
+      nombreAgenteOATC: document.getElementById('agentsDisponiblesDatalist')?.value,
+      tipoOATC: document.getElementById('tipoOATCDatalist')?.value
+    };
+
+    // 3. Verificación lógica: Tipo de cliente sigue siendo obligatorio
+    if (!OATCform.tipoClienteOATC) {
+      Swal.fire('Atención', 'El tipo de cliente es obligatorio.', 'warning');
+      return;
+    }
+
+    // --- NUEVA LÓGICA DE CONFIRMACIÓN PARA CLIENTE VACÍO ---
+    if (!OATCform.nombreClienteOATC) {
+      Swal.fire({
+        title: "¿Registrar sin nombre?",
+        text: "No has ingresado un cliente. Se registrará como 'POR ASIGNAR'.",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#28a745',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Sí, registrar así',
+        cancelButtonText: 'Cancelar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          // Asignamos el valor especial y procedemos al envío
+          OATCform.nombreClienteOATC = "POR ASIGNAR";
+          ejecutarEnvioOATC(OATCform);
+        }
+      });
+    } else {
+      // Si el nombre sí existe, enviamos directamente
+      ejecutarEnvioOATC(OATCform);
+    }
+  }
+
+  /**
+   * Función separada para evitar repetir el código de google.script.run
+   */
+  function ejecutarEnvioOATC(datos) {
+    window.mostrarSpinner();
+    
+    google.script.run
+      .withSuccessHandler(function(res) {
+        // Limpieza selectiva
+        const idsALimpiar = [
+          'clientesDatalistOATC', 
+          'tipoClientesDatalist', 
+          'agentsDisponiblesDatalist', 
+          'tipoOATCDatalist'
+        ];
+        
+        idsALimpiar.forEach(id => {
+          const el = document.getElementById(id); 
+          if (el) el.value = '';
+        });
+
+        if (window.obtenerSiguienteNumeroOATC) window.obtenerSiguienteNumeroOATC();
+        window.actualizarVistasPostAccion(res, false);
+      })
+      .withFailureHandler(function(err) {
+        if (window.ocultarSpinner) window.ocultarSpinner(); // Asegúrate de ocultarlo en error
+        if (window.onFailureConexion) {
+          window.onFailureConexion(err);
+        } else {
+          Swal.fire('Error', 'Fallo en la conexión con el servidor.', 'error');
+        }
+      })
+      .registrarFormOATC(datos);
+  } 
+
+
+  // --- MEJORA DE UX DE CLIENTES ---
+  const initClienteInputUX = () => {
+    const inputCliente = document.getElementById('clientesDatalistOATC');
+    if (inputCliente) {
+      inputCliente.addEventListener('input', function(e) {
+        const val = e.target.value;
+        if (val.includes(' | DNI:')) {
+          const parts = val.split(' | DNI:');
+          e.target.value = parts[0].trim();
+        }
+      });
+    }
+  };
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initClienteInputUX);
+  } else {
+    initClienteInputUX();
+  }
+
+  window.handleOATCButtonClick = handleOATCButtonClick;
+  window.actualizarVistasPostAccion = actualizarVistasPostAccion;
+  window.activarRegistrarOATC = activarRegistrarOATC;
+
+})();
+</script>

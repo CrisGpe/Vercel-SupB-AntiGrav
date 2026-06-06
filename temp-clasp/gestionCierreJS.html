@@ -1,0 +1,69 @@
+<script>
+/**
+ * --- GESTIÓN DE CIERRE (CLOSE SYSTEM) ---
+ * Maneja el proceso de pasar datos al borrador/histórico y limpiar la vista diaria.
+ */
+
+/**
+ * Manejador de éxito tras cerrar el sistema.
+ * @param {string} responseMessage - Mensaje opcional del servidor.
+ */
+function onSuccessPasarBorrador(responseMessage) {
+  console.log("DEBUG(Cliente/CerrarSistema): Cierre ejecutado con éxito.");
+
+  // 1. Ocultar Spinner
+  if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+
+  // 2. Notificación de éxito
+  Swal.fire({
+    icon: 'success',
+    title: 'Sistema Cerrado',
+    text: responseMessage || 'Los datos han sido migrados al histórico correctamente.',
+    confirmButtonColor: '#3085d6'
+  });
+
+  // 3. Actualizar vistas locales para reflejar el estado vacío/inicial
+  if (typeof window.filtrarView === 'function') window.filtrarView(); 
+  if (typeof window.filtrarViewOATCPendientes === 'function') window.filtrarViewOATCPendientes();
+  if (typeof window.loadInfoDataListAgentesActivos === 'function') window.loadInfoDataListAgentesActivos();
+  if (typeof window.obtenerSiguienteNumeroOATC === 'function') window.obtenerSiguienteNumeroOATC();
+}
+
+/**
+ * Inicia el proceso de cierre con una confirmación de seguridad.
+ */
+function cerrarSistema() {
+  Swal.fire({
+    title: "¿Cerrar Sistema?",
+    text: "Esta acción pasará todos los registros actuales al histórico. Asegúrate de haber terminado la jornada.",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Sí, cerrar y archivar',
+    cancelButtonText: 'Cancelar'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      // Activar Feedback Visual
+      if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+      // Ejecución en el Servidor
+      google.script.run
+        .withSuccessHandler(onSuccessPasarBorrador)
+        .withFailureHandler(function(error) {
+          if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+          if (typeof window.onFailureConexion === 'function') {
+            window.onFailureConexion(error);
+          } else {
+            Swal.fire('Error Crítico', error.message, 'error');
+          }
+        })
+        .pasarBorrador();
+    }
+  });
+}
+
+// --- EXPOSICIÓN GLOBAL ---
+window.cerrarSistema = cerrarSistema;
+
+</script>

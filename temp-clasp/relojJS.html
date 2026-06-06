@@ -1,0 +1,32 @@
+<script>
+  function showDate() {
+    let date = new Date();
+    let d = date.getDate();
+    let m = date.getMonth() + 1; // Months are 0-indexed
+    let y = String(date.getFullYear()).slice(-2); // Get last 2 digits of the year
+    let currentDate = document.querySelector("#date");
+    if (currentDate) currentDate.innerHTML = `${d}/${m}/${y}`;
+  }
+
+  function showTime() {
+    let date = new Date();
+    let h = date.getHours();
+    let m = date.getMinutes();
+    let s = date.getSeconds();
+    let amPm = h >= 12 ? "pm" : "am";
+
+    h = h % 12;
+    h = h ? h : 12; // 12-hour clock
+    h = h < 10 ? `0${h}` : h;
+    m = m < 10 ? `0${m}` : m;
+    s = s < 10 ? `0${s}` : s;
+
+    let clock = document.querySelector("#my-clock");
+    if (clock) clock.innerHTML = `${h}:${m}:${s} ${amPm}`;
+
+    setTimeout(showTime, 1000);
+  }
+
+  showTime();
+  showDate();
+</script>

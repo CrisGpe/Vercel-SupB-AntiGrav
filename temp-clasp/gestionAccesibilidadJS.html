@@ -1,0 +1,81 @@
+<script>
+  /**
+   * --- GESTIÓN DE ACCESIBILIDAD Y PERSISTENCIA ---
+   */
+  let nivelFuente = 0; 
+  const tamanos = ['14px', '17px', '20px'];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const tamañoGuardado = localStorage.getItem('appFontSize');
+    if (tamañoGuardado) {
+      document.documentElement.style.setProperty('--base-font-size', tamañoGuardado);
+      nivelFuente = tamanos.indexOf(tamañoGuardado);
+      if (nivelFuente === -1) nivelFuente = 0;
+    }
+
+    // Cargar Tema
+    const savedTheme = localStorage.getItem('appTheme');
+    if (savedTheme === 'dark') {
+      document.body.classList.add('dark-theme');
+      const sw = document.getElementById('themeSwitch');
+      if (sw) sw.checked = true;
+    }
+  });
+
+  function toggleTheme() {
+    const isDark = document.body.classList.toggle('dark-theme');
+    localStorage.setItem('appTheme', isDark ? 'dark' : 'light');
+    const sw = document.getElementById('themeSwitch');
+    if (sw) sw.checked = isDark;
+  }
+
+
+  function cambiarTamanoFuente() {
+    nivelFuente = (nivelFuente + 1) % tamanos.length;
+    const nuevoTamano = tamanos[nivelFuente];
+    document.documentElement.style.setProperty('--base-font-size', nuevoTamano);
+    localStorage.setItem('appFontSize', nuevoTamano);
+    
+    // Lo hacemos asíncrono para no bloquear la animación del cambio
+    setTimeout(reajustarTablasLayout, 50);
+  }
+
+  function reajustarTablasLayout() {
+    const tablasIds = ['#ordenesATCTabla', '#disponibilidadTurnosTabla', '#tablaCitas'];
+    tablasIds.forEach(id => {
+      // Solo ajustamos si el elemento está visible para ahorrar recursos
+      const el = document.querySelector(id);
+      if (el && el.offsetWidth > 0 && typeof $ !== 'undefined' && $.fn.DataTable && $.fn.DataTable.isDataTable(id)) {
+        $(id).DataTable().columns.adjust();
+      }
+    });
+  }
+
+  /**
+   * --- GESTIÓN DEL SPINNER (OPTIMIZADA) ---
+   */
+  window.mostrarSpinner = function(texto = "CARGANDO...") {
+    const overlay = document.getElementById('loading-overlay');
+    const txtEl = document.querySelector('.loading-text');
+    if (txtEl) txtEl.innerText = texto.toUpperCase();
+    if (overlay) {
+      overlay.style.display = 'flex';
+      overlay.style.pointerEvents = 'all'; // Bloqueo total de seguridad
+    }
+  };
+
+  window.ocultarSpinner = function() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+      // Forzamos al navegador a priorizar el ocultamiento visual
+      requestAnimationFrame(() => {
+        overlay.style.display = 'none';
+        overlay.style.pointerEvents = 'none';
+      });
+    }
+  };
+
+  // Alias
+  window.mostrarCarga = window.mostrarSpinner;
+  window.ocultarCarga = window.ocultarSpinner;
+</script>

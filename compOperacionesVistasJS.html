@@ -1,0 +1,1330 @@
+<!-- CONTROLADOR DE OPERACIONES, OATC, VENTAS DE CAJA Y CIERRE -->
+
+<!-- ========================================== -->
+<!-- DE: gestionOrdenesATCJS.html               -->
+<!-- ========================================== -->
+<script>
+/**
+ * --- GESTIÓN DE ÓRDENES ATC ---
+ */
+(function() {
+
+  function handleOATCButtonClick(e) {
+    const target = e.target.closest('button, .eliminarOATC'); 
+    if (!target) return;
+
+    const row = target.closest('tr');
+    if (!row) return;
+
+    const oatcIdLimpio = target.getAttribute('data-oatc-id');
+    const agenteNombre = row.querySelector(".ordenesATCAgente")?.textContent?.trim() || "";
+
+    const ejecutarAccionServidor = (nombreFuncion, ...args) => {
+        google.script.run
+          .withSuccessHandler(res => {
+              console.log(`Acción ${nombreFuncion} completada.`);
+              window.actualizarVistasPostAccion(res);
+          })
+          .withFailureHandler(err => {
+              window.onFailureConexion(err);
+              if (window.ocultarCargando) window.ocultarCargando();
+          })[nombreFuncion](...args);
+    };
+
+    if (target.matches(".resolverOATC")) {
+        validarYEjecutar(oatcIdLimpio, () => {
+            ejecutarAccionServidor("resolverOATC", oatcIdLimpio, agenteNombre);
+        }, "¿Desea marcar como RESUELTA esta orden?");
+    }
+    
+    else if (target.matches(".activarAsesoriaOATC")) {
+        validarYEjecutar(oatcIdLimpio, () => {
+            ejecutarAccionServidor("convertirYActivarAsesoria", oatcIdLimpio, agenteNombre);
+        }, "¿Activar Asesoría para esta orden?");
+    }
+    
+    else if (target.matches(".terminarATCBtn")) {
+        validarYEjecutar(oatcIdLimpio, () => {
+            ejecutarAccionServidor("terminarATC", oatcIdLimpio, agenteNombre);
+        }, "¿Confirmar la FINALIZACIÓN de la atención?");
+    }
+    
+    else if (target.matches(".reiniciarOATC")) {
+      const rowIndex = row.rowIndex - 1; 
+      Swal.fire({
+          title: "¿Reiniciar registro?",
+          text: "Esta acción restablecerá los tiempos de la orden.",
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Sí, reiniciar'
+      }).then((result) => {
+          if (result.isConfirmed) {
+              if (window.mostrarCargando) window.mostrarCargando();
+              ejecutarAccionServidor("reiniciarOATC", rowIndex);
+          } else {
+              if (window.ocultarCargando) window.ocultarCargando();
+          }
+      });
+    }
+    
+    else if (target.matches(".eliminarOATC")) {
+      if (oatcIdLimpio && window.abrirModalEliminarOATC) {
+          window.abrirModalEliminarOATC(oatcIdLimpio);
+      }
+    }
+  }
+
+  function validarYEjecutar(id, callback, mensaje = null) {
+    if (!id) { 
+      if (window.ocultarCargando) window.ocultarCargando();
+      Swal.fire('Error', 'No se detectó el ID de la orden', 'error'); 
+      return; 
+    }
+
+    if (mensaje) {
+      Swal.fire({ 
+        title: mensaje, 
+        icon: 'question', 
+        showCancelButton: true,
+        confirmButtonText: 'Confirmar',
+        cancelButtonText: 'Cancelar'
+      }).then(r => { 
+        if(r.isConfirmed) {
+          if (window.mostrarCargando) window.mostrarCargando();
+          callback(); 
+        } else {
+          if (window.ocultarCargando) window.ocultarCargando();
+        }
+      });
+    } else { 
+      callback(); 
+    }
+  }
+
+  function actualizarVistasPostAccion(respuesta, esSilencioso = false) {
+    if (!esSilencioso) window.ocultarSpinner();
+
+    if (window.filtrarView) window.filtrarView(esSilencioso);
+    
+    if (window.filtroOATCActivo === 'Pendientes' && window.filtrarViewOATCPendientes) {
+      window.filtrarViewOATCPendientes(esSilencioso);
+    } else if (window.filtroOATCActivo === 'Citas' && window.filtrarViewCitasRegistradas) {
+      window.filtrarViewCitasRegistradas(esSilencioso);
+    }
+
+    if (window.loadInfoDataListAgentesActivos) window.loadInfoDataListAgentesActivos();
+
+    if (!esSilencioso && typeof respuesta === 'string') {
+      Swal.fire({ title: 'Éxito', text: respuesta, icon: 'success', timer: 1500, showConfirmButton: false });
+    }
+  }
+
+  function activarRegistrarOATC() {
+    const formulario = document.getElementById('formOATC');
+
+    if (!formulario.checkValidity()) {
+      formulario.reportValidity();
+      return;
+    }
+
+    const OATCform = {
+      numeroOATC: document.getElementById('floatingInputNumeroOATC')?.value,
+      fechaOATC: document.getElementById('datePicker')?.value,
+      nombreClienteOATC: document.getElementById('clientesDatalistOATC')?.value.trim(), 
+      tipoClienteOATC: document.getElementById('tipoClientesDatalist')?.value,
+      nombreAgenteOATC: document.getElementById('agentsDisponiblesDatalist')?.value,
+      tipoOATC: document.getElementById('tipoOATCDatalist')?.value
+    };
+
+    if (!OATCform.tipoClienteOATC) {
+      Swal.fire('Atención', 'El tipo de cliente es obligatorio.', 'warning');
+      return;
+    }
+
+    if (!OATCform.nombreClienteOATC) {
+      Swal.fire({
+        title: "¿Registrar sin nombre?",
+        text: "No has ingresado un cliente. Se registrará como 'POR ASIGNAR'.",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#28a745',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Sí, registrar así',
+        cancelButtonText: 'Cancelar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          OATCform.nombreClienteOATC = "POR ASIGNAR";
+          ejecutarEnvioOATC(OATCform);
+        }
+      });
+    } else {
+      ejecutarEnvioOATC(OATCform);
+    }
+  }
+
+  function ejecutarEnvioOATC(datos) {
+    window.mostrarSpinner();
+    
+    google.script.run
+      .withSuccessHandler(function(res) {
+        const idsALimpiar = [
+          'clientesDatalistOATC', 
+          'tipoClientesDatalist', 
+          'agentsDisponiblesDatalist', 
+          'tipoOATCDatalist'
+        ];
+        
+        idsALimpiar.forEach(id => {
+          const el = document.getElementById(id); 
+          if (el) el.value = '';
+        });
+
+        if (window.obtenerSiguienteNumeroOATC) window.obtenerSiguienteNumeroOATC();
+        window.actualizarVistasPostAccion(res, false);
+      })
+      .withFailureHandler(function(err) {
+        if (window.ocultarSpinner) window.ocultarSpinner();
+        if (window.onFailureConexion) {
+          window.onFailureConexion(err);
+        } else {
+          Swal.fire('Error', 'Fallo en la conexión con el servidor.', 'error');
+        }
+      })
+      .registrarFormOATC(datos);
+  } 
+
+  const initClienteInputUX = () => {
+    const inputCliente = document.getElementById('clientesDatalistOATC');
+    if (inputCliente) {
+      inputCliente.addEventListener('input', function(e) {
+        const val = e.target.value;
+        if (val.includes(' | DNI:')) {
+          const parts = val.split(' | DNI:');
+          e.target.value = parts[0].trim();
+        }
+      });
+    }
+  };
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initClienteInputUX);
+  } else {
+    initClienteInputUX();
+  }
+
+  window.handleOATCButtonClick = handleOATCButtonClick;
+  window.actualizarVistasPostAccion = actualizarVistasPostAccion;
+  window.activarRegistrarOATC = activarRegistrarOATC;
+
+})();
+</script>
+
+<!-- ========================================== -->
+<!-- DE: gestionTablaOATCViewJS.html            -->
+<!-- ========================================== -->
+<script>
+/**
+ * GESTIÓN DE TABLA OATC (ÓRDENES DE ATENCIÓN) - VERSIÓN UNIFICADA
+ */
+var oatcDataTableInstance = null; 
+
+(function() {
+  const L_INDEX_ID_OATC = 1; 
+  const L_INDEX_TIPO_OATC = 2; 
+  const L_INDEX_CLIENTE_NOMBRE = 4; 
+  const L_INDEX_TIPO_CLIENTE = 5; 
+  const L_INDEX_AGENTE_NOMBRE = 6; 
+  const L_INDEX_HORA_RESOLUCION = 7; 
+  const L_INDEX_INICIO_ESPERA = 9;  
+  const L_INDEX_FIN_ESPERA = 10;
+
+  function renderizarTablaOATC(registrosOATC) {
+    const tableBody = document.getElementById("ordenesATCTablaBody");
+    const template = document.getElementById("ordenesATCFilas");
+    const tablaCompleta = document.getElementById("ordenesATCTabla"); 
+    
+    if (!tableBody || !template || !tablaCompleta || !Array.isArray(registrosOATC)) return;
+
+    if (oatcDataTableInstance) {
+      oatcDataTableInstance.destroy(); 
+      oatcDataTableInstance = null;
+    }
+
+    tableBody.innerHTML = ''; 
+    const fragment = document.createDocumentFragment();
+
+    registrosOATC.forEach(registroOATC => {
+      const idOATC = registroOATC[L_INDEX_ID_OATC];
+      const horaRegistro = registroOATC[0];
+      const tipoOATCTexto = registroOATC[L_INDEX_TIPO_OATC]; 
+      const tipoClienteTexto = registroOATC[L_INDEX_TIPO_CLIENTE]; 
+      const agenteNombre = registroOATC[L_INDEX_AGENTE_NOMBRE] ? String(registroOATC[L_INDEX_AGENTE_NOMBRE]).trim() : ""; 
+      const horaResolucion = registroOATC[L_INDEX_HORA_RESOLUCION];
+      const inicioEspera = registroOATC[L_INDEX_INICIO_ESPERA] ? String(registroOATC[L_INDEX_INICIO_ESPERA]).trim() : "";
+      const finEspera = registroOATC[L_INDEX_FIN_ESPERA] ? String(registroOATC[L_INDEX_FIN_ESPERA]).trim() : "";
+      const correlativo = registroOATC[11];
+      const agenteEstadoTexto = registroOATC[12] ? String(registroOATC[12]).trim() : "";
+
+      const trClone = template.content.cloneNode(true);
+      const filaTR = trClone.querySelector("tr");
+      const accionesCell = trClone.querySelector(".ordenesATCAcciones");
+      accionesCell.innerHTML = ''; 
+        
+      const estaResuelta = (String(horaResolucion).trim() !== "");
+      const agenteVacio = (agenteNombre === ""); 
+      const esperaActiva = (inicioEspera !== "" && finEspera === "" && !estaResuelta);
+
+      const tipoClienteNormalizado = String(tipoClienteTexto).toLowerCase().replace(/í/g, 'i').trim();
+      const esCita = (tipoClienteNormalizado === 'cita');
+      const esProducto = (tipoClienteNormalizado === 'producto');
+
+      if (esCita && !estaResuelta) filaTR.classList.add('fila-cita-pendiente');
+      else if (esperaActiva) filaTR.classList.add('fila-en-espera');
+
+      const idPrefijo = correlativo ? String(correlativo) : horaRegistro;
+      let ordText = "";
+      if (tipoClienteNormalizado === "cita") {
+        ordText = `${idPrefijo} (Cita)`;
+      } else if (tipoClienteNormalizado === "cliente") {
+        ordText = `${idPrefijo} (Cliente)`;
+      } else if (tipoClienteNormalizado === "turno") {
+        ordText = `${idPrefijo} (Turno)`;
+      } else if (tipoClienteNormalizado === "correccion" || tipoClienteNormalizado === "corrección") {
+        ordText = `${idPrefijo} (Corrección)`;
+      } else if (tipoClienteNormalizado === "turno niño" || tipoClienteNormalizado === "turnonino") {
+        ordText = `${idPrefijo} (Niño)`;
+      } else if (tipoClienteNormalizado === "turno caballero" || tipoClienteNormalizado === "turnocaballero") {
+        ordText = `${idPrefijo} (Caballero)`;
+      } else if (tipoClienteNormalizado === "producto") {
+        ordText = `${idPrefijo} (Venta)`;
+      } else {
+        ordText = `${idPrefijo}`;
+      }
+
+      trClone.querySelector(".ordenesATCID").textContent = ordText;
+      trClone.querySelector(".ordenesATCHora").textContent = horaRegistro;
+      const nameCell = trClone.querySelector(".ordenesATCCliente");
+      if (!estaResuelta) {
+        nameCell.innerHTML = `<span class="clickeable-cliente text-primary text-decoration-underline" style="cursor: pointer;" data-oatc-id="${idOATC}">${registroOATC[L_INDEX_CLIENTE_NOMBRE]}</span>`;
+      } else {
+        nameCell.textContent = registroOATC[L_INDEX_CLIENTE_NOMBRE];
+      }
+      
+      const tipoOATCCell = trClone.querySelector(".tipoOATC");
+      if (esperaActiva) {
+        tipoOATCCell.innerHTML = '<span class="badge bg-warning text-dark">🔴 EN ESPERA</span>';
+      } else {
+        tipoOATCCell.textContent = tipoOATCTexto;
+      }
+
+      trClone.querySelector(".ordenesATCAgente").textContent = agenteNombre;
+      const opcionesDropdown = generarDropdownOpciones(idOATC);
+
+      if (!estaResuelta) {
+        if (esperaActiva) {
+          accionesCell.innerHTML += `<button class="btn btn-warning btn-sm btnTerminarEsperaOATC me-1" data-oatc-id="${idOATC}">Terminar espera</button>`;
+        }
+        else if (esProducto) {
+          accionesCell.innerHTML += `<button class="btn btn-success btn-sm btnEnviarCaja me-1" data-oatc-id="${idOATC}" data-cliente="${registroOATC[L_INDEX_CLIENTE_NOMBRE]}" data-agente="${agenteNombre}"><i class="fas fa-paper-plane"></i></button>`;
+        }
+        else if (esCita) {
+          accionesCell.innerHTML += `<button class="btn btn-success btn-sm resolverOATC me-1" data-oatc-id="${idOATC}">Comenzar atención</button>`;
+        }
+        else if (agenteVacio) {
+          accionesCell.innerHTML += `<button class="btn btn-outline-primary btn-sm asignarActivarModalBtn me-1" data-oatc-id="${idOATC}"> + Agente</button>`;
+        }
+        else if (agenteEstadoTexto === "Asesorando") {
+          if (tipoClienteNormalizado === 'cliente') {
+            accionesCell.innerHTML += `<button class="btn btn-success btn-sm btnAtenderOATC me-1" data-oatc-id="${idOATC}" data-accion="cliente">Atender cliente</button>`;
+          } else if (tipoClienteNormalizado === 'turno') {
+            accionesCell.innerHTML += `<button class="btn btn-success btn-sm btnAtenderOATC me-1" data-oatc-id="${idOATC}" data-accion="turno">Atender turno</button>`;
+          } else {
+            accionesCell.innerHTML += `<button class="btn btn-success btn-sm btnAtenderOATC me-1" data-oatc-id="${idOATC}" data-accion="otro">Comenzar atención</button>`;
+          }
+        }
+        else {
+          accionesCell.innerHTML += `<button class="btn btn-success btn-sm resolverOATC me-1" data-oatc-id="${idOATC}">Terminar atención</button>`;
+        }
+
+        accionesCell.innerHTML += `<button class="btn btn-link btn-sm eliminarOATC text-danger p-1 me-1" data-oatc-id="${idOATC}" onclick="event.preventDefault(); event.stopPropagation(); window.abrirModalEliminarOATC('${idOATC}');"><i class="fas fa-trash-alt"></i></button>`;
+        
+        if (!esperaActiva) {
+          accionesCell.innerHTML += opcionesDropdown;
+        }
+      } else {
+        accionesCell.innerHTML += `<button class="btn btn-outline-info btn-sm btnAbrirNotasOATC me-1" data-oatc-id="${idOATC}"><i class="fas fa-edit"></i> Notas</button>`;
+        accionesCell.innerHTML += `<button class="btn btn-warning btn-sm reiniciarOATC me-1" data-oatc-id="${idOATC}">Reiniciar</button>`;
+      }
+        
+      fragment.appendChild(trClone);
+    });
+
+    tableBody.appendChild(fragment);
+
+    oatcDataTableInstance = new DataTable(tablaCompleta, {
+        searching: false, paging: false, info: false, order: [[0, 'asc']], 
+        language: { url: 'https://cdn.datatables.net/plug-ins/2.1.3/i18n/es-ES.json' }
+    });
+    tablaCompleta.removeEventListener('click', window.handleOATCMultiClick);
+    tablaCompleta.addEventListener('click', window.handleOATCMultiClick);
+  }
+
+  function ejecutarAccionOATC(metodo, filtroLabel) {
+    if (filtroLabel) window.filtroOATCActivo = filtroLabel;
+    if (window.mostrarCargando) window.mostrarCargando();
+    google.script.run
+      .withSuccessHandler(res => {
+        renderizarTablaOATC(res);
+        if (window.ocultarCargando) window.ocultarCargando();
+      })
+      .withFailureHandler(window.onFailureConexion)
+      [metodo]();
+  }
+
+  window.filtrarViewCitasRegistradas = () => ejecutarAccionOATC('obtenerCitasRegistradasEnAdelante', 'Citas Registradas');
+  window.filtrarViewOATCPendientes = () => ejecutarAccionOATC('obtenerOATCPendientes', 'Pendientes');
+  window.filtrarViewOATCResueltas = () => ejecutarAccionOATC('obtenerOATCResueltas', 'Resueltas');
+  window.filtrarViewTodas = () => ejecutarAccionOATC('obtenerOATCRegistradasTodas', 'Todas');
+
+  window.llamarServidorPonerEnEspera = function(oatcId) {
+    google.script.run
+      .withSuccessHandler(res => { if (window.actualizarVistasPostAccion) window.actualizarVistasPostAccion(res); })
+      .withFailureHandler(window.onFailureConexion)
+      .ponerEnEsperaOATC(oatcId);
+  };
+
+  window.llamarServidorActivarOATC = function(oatcId) {
+    if (confirm(`¿Confirma que desea activar la OATC ${oatcId}?`)) {
+      google.script.run
+        .withSuccessHandler(window.actualizarVistasPostAccion)
+        .withFailureHandler(window.onFailureConexion)
+        .activarOATC(oatcId);
+    }
+  };
+
+  function generarDropdownOpciones(idOATC) {
+    return `
+      <div class="dropdown d-inline-block">
+        <button class="btn btn-sm btn-warning dropdown-toggle p-1 ms-1" type="button" data-bs-toggle="dropdown">
+          <span style="font-size: 1.2em;">⋮</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item ponerEnEsperaOATC" data-oatc-id="${idOATC}">Iniciar espera</a></li>
+        </ul>
+      </div>`;
+  }
+
+  window.handleOATCMultiClick = function(event) {
+    const link = event.target.closest('a');
+    if (link) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    const target = event.target.closest('[data-oatc-id]');
+    if (!target) return; 
+
+    const rawId = target.getAttribute('data-oatc-id');
+    const oatcId = String(rawId).split(' ')[0].trim();
+    const row = target.closest('tr');
+    const agenteNombre = row?.querySelector(".ordenesATCAgente")?.textContent?.trim() || "";
+
+    if (target.matches(".eliminarOATC")) {
+      console.log("Intentando eliminar ID:", oatcId);
+      if (window.abrirModalEliminarOATC) {
+        window.abrirModalEliminarOATC(oatcId);
+      }
+    } 
+    else if (target.matches(".asignarActivarModalBtn")) {
+      window.abrirModalAsignacionAgente?.(oatcId);
+    } 
+    else if (target.matches(".editarClienteOATC") || target.matches(".clickeable-cliente")) {
+      console.log("Abriendo edición de cliente para:", oatcId);
+      if (window.abrirModalEdicionCliente) {
+        window.abrirModalEdicionCliente(oatcId);
+      }
+    } 
+    else if (target.matches(".editarTipoAtencionOATC")) {
+      window.abrirModalEdicionTipoAtencion?.(oatcId);
+    }
+    else if (target.matches(".btnEnviarCaja")) {
+      const datosParaCaja = {
+        id: oatcId,
+        cliente: target.getAttribute('data-cliente') || "No definido",
+        agente: target.getAttribute('data-agente') || "No definido"
+      };
+      
+      if (typeof window.abrirModalVentaCaja === 'function') {
+        window.abrirModalVentaCaja(datosParaCaja);
+      }
+    }
+    else if (target.matches(".btnAbrirNotasOATC")) {
+      console.log("Abriendo notas para ID limpio:", oatcId);
+      if (window.prepararYAbrirModalNotas) {
+        window.prepararYAbrirModalNotas(oatcId);
+      }
+    }
+    else if (target.matches(".ponerEnEsperaOATC")) {
+      Swal.fire({
+        title: '¿Iniciar espera?',
+        text: `La orden ${oatcId} pasará a estado de espera.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, iniciar espera'
+      }).then((result) => {
+        if (result.isConfirmed && window.llamarServidorPonerEnEspera) {
+          window.llamarServidorPonerEnEspera(oatcId);
+        }
+      });
+    }
+    else if (target.matches(".btnTerminarEsperaOATC")) {
+      Swal.fire({
+        title: '¿Terminar espera?',
+        text: `Se calculará el tiempo de espera y se iniciará la atención.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, terminar espera'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          if (window.mostrarCargando) window.mostrarCargando();
+          google.script.run
+            .withSuccessHandler(res => { if (window.actualizarVistasPostAccion) window.actualizarVistasPostAccion(res); })
+            .withFailureHandler(window.onFailureConexion)
+            .terminarEsperaOATC(oatcId);
+        }
+      });
+    }
+    else if (target.matches(".btnAtenderOATC")) {
+      const accion = target.getAttribute('data-accion');
+      let msg = "¿Comenzar la atención?";
+      if (accion === 'cliente') msg = "¿Iniciar 'Atender cliente'?";
+      else if (accion === 'turno') msg = "¿Iniciar 'Atender turno'?";
+      
+      Swal.fire({
+        title: msg,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, iniciar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          if (window.mostrarCargando) window.mostrarCargando();
+          google.script.run
+            .withSuccessHandler(res => { if (window.actualizarVistasPostAccion) window.actualizarVistasPostAccion(res); })
+            .withFailureHandler(window.onFailureConexion)
+            .iniciarAtencionOATC(oatcId, agenteNombre);
+        }
+      });
+    }
+  };
+
+  window.renderizarTablaOATC = renderizarTablaOATC;
+
+})();
+
+window.prepararYAbrirModalNotas = function(oatcId) {
+  document.getElementById('notaOatcId').value = oatcId;
+  document.getElementById('notaMonto').value = "";
+  document.getElementById('notaTexto').value = "";
+  
+  const modalElement = document.getElementById('modalNotasOATC');
+  const modalInstance = bootstrap.Modal.getOrCreateInstance(modalElement);
+  modalInstance.show();
+
+  modalElement.addEventListener('shown.bs.modal', function () {
+      const inputMonto = document.getElementById('notaMonto');
+      inputMonto.focus();
+  }, { once: true }); 
+};
+
+window.guardarNotasServidor = function() {
+  const id = document.getElementById('notaOatcId').value; 
+  const monto = document.getElementById('notaMonto').value;
+  const notas = document.getElementById('notaTexto').value;
+
+  if (!id) {
+    Swal.fire('Error', 'No se encontró el ID de la OATC. Intente abrir el modal de nuevo.', 'error');
+    return;
+  }
+
+  if (window.mostrarCargando) window.mostrarCargando();
+
+  google.script.run
+    .withSuccessHandler(res => {
+      if (window.ocultarCargando) window.ocultarCargando();
+      
+      if (res.success) {
+        Swal.fire({
+          icon: 'success',
+          title: '¡Guardado!',
+          text: 'Detalles registrados en Borrador.',
+          timer: 1500,
+          showConfirmButton: false
+        });
+        
+        const modalElement = document.getElementById('modalNotasOATC');
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        if (modalInstance) modalInstance.hide();
+      } else {
+        Swal.fire('Error', res.error, 'error');
+      }
+    })
+    .withFailureHandler(err => {
+      if (window.ocultarCargando) window.ocultarCargando();
+      Swal.fire('Error Crítico', 'Error de conexión con el servidor', 'error');
+    })
+    .guardarDetalleNotas(id, monto, notas);
+};
+</script>
+
+<!-- ========================================== -->
+<!-- DE: fidelizacionClienteJS.html             -->
+<!-- ========================================== -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const btn = document.getElementById("btnFidelizacion");
+  if (btn) {
+    btn.addEventListener("click", abrirModalFidelizacion);
+  }
+});
+
+let DATA_CLIENTES_GLOBAL = [];
+
+function abrirModalFidelizacion() {
+  if (window.mostrarCargando) window.mostrarCargando();
+
+  let modalElem = document.getElementById('modalFidelizacion');
+  if (!modalElem) {
+    const html = `
+      <style>
+        #modalFidelizacion .modal-body {
+          background-color: #f8f9fa !important;
+          color: #212529 !important;
+        }
+        #modalFidelizacion .modal-content {
+          background-color: #ffffff !important;
+        }
+        #modalFidelizacion .header-filter-box,
+        #modalFidelizacion .table-container-box {
+          background-color: #ffffff !important;
+          border-color: #dee2e6 !important;
+        }
+        #modalFidelizacion table {
+          color: #212529 !important;
+        }
+        #modalFidelizacion table td {
+          color: #495057 !important;
+          background-color: transparent !important;
+        }
+        #modalFidelizacion .search-helper-text {
+          color: #6c757d !important;
+        }
+        #modalFidelizacion .dataTables_info,
+        #modalFidelizacion .dataTables_length,
+        #modalFidelizacion .dataTables_filter {
+          color: #495057 !important;
+        }
+        #modalFidelizacion .dataTables_filter input {
+          border: 1px solid #ced4da !important;
+          background-color: #ffffff !important;
+          color: #212529 !important;
+          border-radius: 6px;
+          padding: 4px 8px;
+          outline: none;
+        }
+        #modalFidelizacion .dataTables_paginate .paginate_button {
+          color: #212529 !important;
+        }
+
+        body.dark-theme #modalFidelizacion .modal-body {
+          background-color: #121212 !important;
+          color: #f8f9fa !important;
+        }
+        body.dark-theme #modalFidelizacion .modal-content {
+          background-color: #1e1e1e !important;
+          border: 1px solid #333333 !important;
+        }
+        body.dark-theme #modalFidelizacion .header-filter-box,
+        body.dark-theme #modalFidelizacion .table-container-box {
+          background-color: #1a1a1a !important;
+          border-color: #2d2d2d !important;
+        }
+        body.dark-theme #modalFidelizacion table {
+          color: #ffffff !important;
+        }
+        body.dark-theme #modalFidelizacion table td {
+          color: #e2e8f0 !important;
+          border-bottom: 1px solid #2d2d2d !important;
+          background-color: transparent !important;
+        }
+        body.dark-theme #modalFidelizacion .search-helper-text {
+          color: #a0aec0 !important;
+        }
+        body.dark-theme #modalFidelizacion .dataTables_info,
+        body.dark-theme #modalFidelizacion .dataTables_length,
+        body.dark-theme #modalFidelizacion .dataTables_filter {
+          color: #e2e8f0 !important;
+        }
+        body.dark-theme #modalFidelizacion .dataTables_filter input {
+          border: 1px solid #444444 !important;
+          background-color: #2d2d2d !important;
+          color: #ffffff !important;
+          border-radius: 6px;
+          padding: 4px 8px;
+          outline: none;
+        }
+        body.dark-theme #modalFidelizacion .dataTables_paginate .paginate_button {
+          color: #ffffff !important;
+        }
+      </style>
+      <div class="modal fade" id="modalFidelizacion" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+          <div class="modal-content border-0 rounded-4 overflow-hidden shadow-lg">
+            <div class="modal-header text-white border-0 py-3 px-4 d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #f77062, #fe5196) !important;">
+              <h5 class="modal-title fw-bold text-uppercase fs-5 m-0" style="letter-spacing: 1px;"><i class="fas fa-heart me-2 text-warning"></i>Fidelización de Clientes</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+              <div class="d-flex justify-content-between align-items-center mb-4 p-3 rounded-3 shadow-sm border header-filter-box">
+                <div class="btn-group shadow-sm" id="grupoFiltrosFidelizacion">
+                  <button class="btn btn-outline-secondary active px-4" onclick="filtrarCampana('todas', this)" style="font-weight: 600; border-radius: 8px 0 0 8px;">Todos</button>
+                  <button class="btn btn-outline-primary px-4" onclick="filtrarCampana('Células Madre', this)" style="font-weight: 600;">C. Células Madre</button>
+                  <button class="btn btn-outline-info px-4" onclick="filtrarCampana('Kerastase', this)" style="font-weight: 600; border-radius: 0 8px 8px 0;">C. Kerastase</button>
+                </div>
+              </div>
+              <div class="rounded-4 shadow-sm p-3 border table-container-box">
+                <div class="d-flex justify-content-between align-items-center mb-2 search-helper-container">
+                  <div></div>
+                  <small class="fw-bold search-helper-text" style="font-size: 0.85rem;"><i class="fas fa-search me-1 text-primary"></i>Búsqueda habilitada por Nombre, DNI o Celular</small>
+                </div>
+                <table id="tablaFidelizacion" class="table table-hover align-middle w-100">
+                  <thead>
+                    <tr class="table-dark">
+                      <th style="border-radius: 8px 0 0 8px;">DNI</th>
+                      <th>Cliente</th>
+                      <th>Celular</th>
+                      <th>Fecha Atención</th>
+                      <th class="d-none">Timestamp</th> 
+                      <th class="text-center" style="border-radius: 0 8px 8px 0;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bodyFidelizacion"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      DATA_CLIENTES_GLOBAL = JSON.parse(res);
+      if (window.ocultarCargando) window.ocultarCargando();
+      renderizarTablaFidelizacion(DATA_CLIENTES_GLOBAL);
+      const m = new bootstrap.Modal(document.getElementById('modalFidelizacion'));
+      m.show();
+    })
+    .obtenerDatosFidelizacionCruza();
+}
+
+function renderizarTablaFidelizacion(lista) {
+  const tbody = document.getElementById("bodyFidelizacion");
+  if (!tbody) return;
+
+  if ($.fn.DataTable.isDataTable('#tablaFidelizacion')) {
+    $('#tablaFidelizacion').DataTable().destroy();
+  }
+
+  if (lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">No hay registros para esta vista.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lista.map(c => {
+    const time = c.ultimaVisitaTime || 0;
+    const nombreCompleto = `${c.nombre || ''} ${c.apellido || ''}`.trim();
+    const nombreEscapado = nombreCompleto.replace(/'/g, "\\'");
+
+    return `
+    <tr>
+      <td>${c.dni || '---'}</td>
+      <td>${nombreCompleto}</td>
+      <td>${c.celular || '---'}</td>
+      <td>${c.ultimaVisitaTexto || '---'}</td>
+      <td class="d-none">${time}</td>
+      <td class="text-center">
+        ${c.esCampana 
+          ? `<span class="badge bg-success">En Campaña</span>` 
+          : `<button class="btn btn-sm btn-outline-dark" onclick="verHistorialVisitas('${c.dni}', '${nombreEscapado}')">
+               <i class="fas fa-eye"></i>
+             </button>`
+        }
+      </td>
+    </tr>`;
+  }).join("");
+
+  $('#tablaFidelizacion').DataTable({
+    language: { url: 'https://cdn.datatables.net/plug-ins/1.10.25/i18n/Spanish.json' },
+    pageLength: 10,
+    order: [[4, "desc"]], 
+    columnDefs: [
+      { targets: [4], visible: false, searchable: false }, 
+      { targets: [5], orderable: false } 
+    ]
+  });
+}
+
+function filtrarCampana(tipo, elemento) {
+  if (elemento) {
+    const botones = elemento.parentElement.querySelectorAll('.btn');
+    botones.forEach(b => b.classList.remove('active'));
+    elemento.classList.add('active');
+  }
+
+  if (tipo === 'todas') {
+    renderizarTablaFidelizacion(DATA_CLIENTES_GLOBAL);
+    return;
+  }
+
+  if (window.mostrarCargando) window.mostrarCargando();
+  
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (window.ocultarCargando) window.ocultarCargando();
+      renderizarTablaFidelizacion(JSON.parse(res));
+    })
+    .obtenerDatosPorCampana(tipo);
+}
+
+function verHistorialVisitas(dni, nombre) {
+  if (window.mostrarCargando) window.mostrarCargando();
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (window.ocultarCargando) window.ocultarCargando();
+      const visitas = JSON.parse(res);
+      
+      if (!visitas || visitas.length === 0) {
+        Swal.fire({ title: `Historial de ${nombre}`, text: "Sin visitas pendientes.", icon: "info" });
+        return;
+      }
+
+      let tablaHtml = `
+        <div class="table-responsive" style="max-height: 400px;">
+          <table class="table table-sm table-striped table-bordered mt-3" style="font-size: 0.85rem;">
+            <thead class="table-dark text-center">
+              <tr>
+                <th><input type="checkbox" onclick="toggleAllVisitas(this)"></th>
+                <th>Fecha</th>
+                <th>Atención</th>
+                <th>Agente</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${visitas.map(v => `
+                <tr>
+                  <td class="text-center">
+                    <input type="checkbox" class="check-visita" 
+                      data-fecha="${v.fecha}" data-atencion="${v.atencion}" 
+                      data-dni="${dni}" data-nombre="${nombre}">
+                  </td>
+                  <td>${v.fecha}</td>
+                  <td>${v.atencion}</td>
+                  <td>${v.agente}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>`;
+
+      Swal.fire({
+        title: `<i class="fas fa-history"></i> Historial: ${nombre}`,
+        html: tablaHtml,
+        width: '800px',
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: '<i class="fas fa-vial"></i> Células Madre',
+        denyButtonText: '<i class="fas fa-magic"></i> T. Kerastase',
+        cancelButtonText: 'Cerrar',
+        confirmButtonColor: '#0d6efd',
+        denyButtonColor: '#17a2b8'
+      }).then((result) => {
+        if (result.isConfirmed || result.isDenied) {
+          procesarSeleccionCampana(result.isConfirmed ? "Células Madre" : "Kerastase");
+        }
+      });
+    })
+    .obtenerDetalleVisitasCliente(dni);
+}
+
+function toggleAllVisitas(source) {
+  document.querySelectorAll('.check-visita').forEach(cb => cb.checked = source.checked);
+}
+
+function procesarSeleccionCampana(campana) {
+  const seleccionados = [];
+  document.querySelectorAll('.check-visita:checked').forEach(cb => {
+    seleccionados.push({
+      dni: cb.dataset.dni,
+      nombre: cb.dataset.nombre,
+      fechaAtencion: cb.dataset.fecha,
+      servicioOrigen: cb.dataset.atencion,
+      campanaAsignada: campana
+    });
+  });
+
+  if (seleccionados.length === 0) {
+    Swal.fire("Atención", "Selecciona al menos una atención.", "warning");
+    return;
+  }
+
+  if (window.mostrarCargando) window.mostrarCargando();
+
+  google.script.run
+    .withSuccessHandler(() => {
+      if (window.ocultarCargando) window.ocultarCargando();
+      Swal.fire("Éxito", "Campaña registrada correctamente.", "success").then(() => {
+         abrirModalFidelizacion(); 
+      });
+    })
+    .registrarAccionCampana(seleccionados);
+}
+</script>
+
+<!-- ========================================== -->
+<!-- DE: datosOATCJS.html                       -->
+<!-- ========================================== -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const btn = document.getElementById("btnDatosOATC");
+  if (btn) {
+    btn.addEventListener("click", abrirModalDatosOATC);
+  }
+});
+
+let DATOS_OATC_HISTORICO = [];
+
+function abrirModalDatosOATC() {
+  const modalEl = document.getElementById('modalDatosOATC');
+  if (!modalEl) return;
+
+  const hoyStr = new Date().toISOString().split('T')[0];
+  document.getElementById('filtroFechaInicio').value = hoyStr;
+  document.getElementById('filtroFechaFin').value = hoyStr;
+  
+  const selectAgente = document.getElementById('filtroAgente');
+  selectAgente.innerHTML = '<option value="todos">Todos</option>';
+  
+  const datalist = document.getElementById('datalistAgentes');
+  if (datalist) {
+    const options = Array.from(datalist.options).map(o => o.value);
+    const agentesUnicos = [...new Set(options)].filter(Boolean);
+    agentesUnicos.forEach(nombre => {
+      const opt = document.createElement('option');
+      opt.value = nombre;
+      opt.textContent = nombre;
+      selectAgente.appendChild(opt);
+    });
+  }
+
+  const m = bootstrap.Modal.getOrCreateInstance(modalEl);
+  m.show();
+
+  buscarDatosOATCFiltrados();
+}
+
+function buscarDatosOATCFiltrados() {
+  const start = document.getElementById('filtroFechaInicio').value;
+  const end = document.getElementById('filtroFechaFin').value;
+  
+  if (!start || !end) {
+    Swal.fire("Aviso", "Selecciona fecha de inicio y fin.", "warning");
+    return;
+  }
+
+  if (window.mostrarCargando) window.mostrarCargando();
+
+  google.script.run
+    .withSuccessHandler(function(resRaw) {
+      if (window.ocultarCargando) window.ocultarCargando();
+      try {
+        DATOS_OATC_HISTORICO = JSON.parse(resRaw);
+        aplicarFiltrosEnMemoria();
+      } catch (err) {
+        console.error("Error cargando histórico:", err);
+      }
+    })
+    .withFailureHandler(function(err) {
+      if (window.ocultarCargando) window.ocultarCargando();
+      console.error("Error al obtener histórico de OATC:", err);
+      Swal.fire('Error', 'No se pudo obtener el historial de OATC: ' + (err.message || err), 'error');
+    })
+    .obtenerHistoricoOATCParaFiltros(start, end);
+}
+
+function aplicarFiltrosEnMemoria() {
+  const queryCliente = document.getElementById('filtroCliente').value.toLowerCase().trim();
+  const selectDemanda = document.getElementById('filtroDemanda').value;
+  const selectAtencion = document.getElementById('filtroAtencion').value;
+  const selectAgente = document.getElementById('filtroAgente').value;
+
+  const filtrados = DATOS_OATC_HISTORICO.filter(o => {
+    if (queryCliente) {
+      const matchCli = String(o.clienteNombre).toLowerCase().includes(queryCliente) || String(o.clienteDni).includes(queryCliente);
+      if (!matchCli) return false;
+    }
+
+    if (selectDemanda !== 'todos') {
+      const normaDemanda = String(o.demanda).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      const normaFiltro = selectDemanda.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      if (normaDemanda !== normaFiltro) return false;
+    }
+
+    if (selectAtencion !== 'todos') {
+      const matchAt = String(o.atencion).toLowerCase().includes(selectAtencion.toLowerCase());
+      if (!matchAt) return false;
+    }
+
+    if (selectAgente !== 'todos') {
+      if (String(o.agente).toLowerCase().trim() !== selectAgente.toLowerCase().trim()) return false;
+    }
+
+    return true;
+  });
+
+  renderizarTablaReporteOATC(filtrados);
+}
+
+function renderizarTablaReporteOATC(lista) {
+  const tbody = document.getElementById("bodyReporteDatosOATC");
+  if (!tbody) return;
+
+  if ($.fn.DataTable.isDataTable('#tablaReporteDatosOATC')) {
+    $('#tablaReporteDatosOATC').DataTable().destroy();
+  }
+
+  if (lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">Ningún registro coincide con los filtros activos.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lista.map(o => {
+    let badgeEstado = '';
+    if (o.cancelado && o.cancelado.startsWith("Cancelado")) {
+      badgeEstado = `<span class="badge bg-danger">Cancelado</span>`;
+    } else if (o.horaResuelto && o.horaResuelto !== 'Pendiente') {
+      badgeEstado = `<span class="badge bg-success">Resuelto (${o.horaResuelto})</span>`;
+    } else {
+      badgeEstado = `<span class="badge bg-warning text-dark">Pendiente</span>`;
+    }
+
+    const displayDemanda = String(o.demanda).toUpperCase();
+    const ordText = o.correlativo ? `${o.correlativo} (${displayDemanda})` : `${o.hora} (${displayDemanda})`;
+
+    return `
+      <tr>
+        <td>${o.fechaTexto}</td>
+        <td>${o.hora}</td>
+        <td class="fw-bold">${ordText}</td>
+        <td>${o.clienteNombre} <br><small class="text-muted">DNI: ${o.clienteDni}</small></td>
+        <td>${o.clienteCelular}</td>
+        <td><span class="badge bg-light text-dark border">${displayDemanda}</span></td>
+        <td>${o.atencion}</td>
+        <td><span class="fw-medium">${o.agente}</span></td>
+        <td>${badgeEstado}</td>
+      </tr>
+    `;
+  }).join("");
+
+  $('#tablaReporteDatosOATC').DataTable({
+    language: { url: 'https://cdn.datatables.net/plug-ins/1.10.25/i18n/Spanish.json' },
+    pageLength: 10,
+    order: [[0, "desc"], [1, "desc"]]
+  });
+}
+</script>
+
+<!-- ========================================== -->
+<!-- DE: gestionNoModalVentasCajaJS.html        -->
+<!-- ========================================== -->
+<script>
+/**
+ * --- MÓDULO DE GESTIÓN DE VENTAS A CAJA ---
+ */
+let PRODUCTOS_BBDD = [];
+let CARRITO = [];
+let modalVentaCaja = null;
+
+function renderizarCarrito() {
+  const tbody = document.getElementById('contenedorCarrito');
+  if (!tbody) return;
+
+  if (CARRITO.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted small py-3">El carrito está vacío</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = CARRITO.map((item, index) => `
+    <tr class="align-middle">
+      <td class="py-2">
+        <div class="fw-bold" style="font-size: 0.85rem; line-height: 1.1;">${item.nombre}</div>
+        <div class="text-muted" style="font-size: 0.7rem;">${item.marca} | ${item.linea}</div>
+      </td>
+      <td style="width: 120px;">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text p-1" style="font-size: 0.7rem;">S/</span>
+          <input type="number" class="form-control form-control-sm fw-bold p-1 text-end" 
+                 value="${item.precio.toFixed(2)}" 
+                 step="0.50"
+                 onchange="window.actualizarPrecioCarrito(${index}, this.value)">
+        </div>
+      </td>
+      <td class="text-center">
+        <button class="btn btn-sm btn-outline-danger border-0" onclick="eliminarDelCarrito(${index})">
+          <i class="fas fa-times"></i>
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+window.actualizarPrecioCarrito = function(index, nuevoPrecio) {
+  const valor = parseFloat(nuevoPrecio);
+  if (!isNaN(valor) && valor >= 0) {
+    CARRITO[index].precio = valor;
+  } else {
+    renderizarCarrito(); 
+  }
+};
+
+window.eliminarDelCarrito = function(index) {
+  CARRITO.splice(index, 1);
+  renderizarCarrito();
+};
+
+function filtrarProductos() {
+  const input = document.getElementById('buscarProductoCaja');
+  const lista = document.getElementById('listaBusquedaProductos');
+  if (!input || !lista) return;
+
+  const busqueda = (input.value || "").trim().toLowerCase();
+  
+  if (busqueda.length < 2) {
+    lista.innerHTML = '';
+    return;
+  }
+
+  const sugerencias = PRODUCTOS_BBDD.filter(p => {
+    const nombre = String(p.nombre || "").toLowerCase();
+    const marca = String(p.marca || "").toLowerCase();
+    const linea = String(p.linea || "").toLowerCase();
+    return nombre.includes(busqueda) || marca.includes(busqueda) || linea.includes(busqueda);
+  }).slice(0, 6);
+
+  if (sugerencias.length === 0) {
+    lista.innerHTML = '<div class="list-group-item text-muted small">No hay resultados</div>';
+    return;
+  }
+
+  lista.innerHTML = sugerencias.map(p => {
+    const precioVenta = parseFloat(p.precio) || 0;
+    const precioMin = parseFloat(p.precioMinimo) || 0;
+
+    return `
+      <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2" 
+              onclick="agregarAlCarrito('${p.nombre.replace(/'/g, "\\'")}', ${precioVenta}, '${p.marca}', '${p.linea}')">
+        <div class="text-start">
+          <div class="fw-bold" style="font-size: 0.9rem;">${p.nombre}</div>
+          <small class="text-muted">${p.marca} - ${p.linea}</small>
+        </div>
+        <div class="text-end">
+          <span class="badge bg-success rounded-pill d-block mb-1">S/ ${precioVenta.toFixed(2)}</span>
+          <span class="badge bg-info text-dark rounded-pill" style="font-size: 0.7rem;">Mín: S/ ${precioMin.toFixed(2)}</span>
+        </div>
+      </button>
+    `;
+  }).join('');
+}
+
+window.agregarAlCarrito = function(nombre, precio, marca, linea) {
+  CARRITO.push({ nombre, precio, marca, linea });
+  const inputBusq = document.getElementById('buscarProductoCaja');
+  inputBusq.value = '';
+  inputBusq.focus();
+  document.getElementById('listaBusquedaProductos').innerHTML = '';
+  renderizarCarrito();
+};
+
+async function abrirModalVentaCaja(datosOATC) {
+  const modalElem = document.getElementById('modalVentaCaja');
+  const contenedorInfo = document.getElementById('infoClienteCaja');
+
+  if (!modalElem) return;
+
+  modalVentaCaja = bootstrap.Modal.getOrCreateInstance(modalElem);
+  modalElem.dataset.idOatc = datosOATC.id;
+  modalElem.dataset.cliente = datosOATC.cliente;
+  modalElem.dataset.agente = datosOATC.agente;
+
+  contenedorInfo.innerHTML = `
+    <div class="row align-items-center">
+      <div class="col-8">
+        <div class="small text-uppercase text-muted" style="font-size: 0.7rem;">Cliente</div>
+        <div class="fw-bold text-truncate">${datosOATC.cliente}</div>
+      </div>
+      <div class="col-4 text-end border-start">
+        <div class="small text-uppercase text-muted" style="font-size: 0.7rem;">OATC</div>
+        <div class="fw-bold text-success">#${datosOATC.id}</div>
+      </div>
+    </div>`;
+
+  if (PRODUCTOS_BBDD.length === 0) {
+    if (window.mostrarSpinner) window.mostrarSpinner();
+    try {
+      PRODUCTOS_BBDD = await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .obtenerListaProductosVenta();
+      });
+    } catch(e) { 
+      console.error("Error cargando productos:", e);
+      Swal.fire("Error", "No se pudo cargar la base de productos", "error");
+    }
+    if (window.ocultarSpinner) window.ocultarSpinner();
+  }
+
+  CARRITO = [];
+  renderizarCarrito();
+  
+  const inputBusq = document.getElementById('buscarProductoCaja');
+  inputBusq.value = '';
+  inputBusq.oninput = filtrarProductos;
+
+  document.getElementById('btnFinalizarVenta').onclick = () => window.procesarEnvioCaja();
+
+  modalVentaCaja.show();
+}
+
+window.procesarEnvioCaja = function() {
+  if (CARRITO.length === 0) {
+    Swal.fire("Carrito vacío", "Debes agregar al menos un producto.", "warning");
+    return;
+  }
+
+  const modalElem = document.getElementById('modalVentaCaja');
+  const idOatc = modalElem.dataset.idOatc;
+  const clienteFinal = modalElem.dataset.cliente;
+  const agenteFinal = modalElem.dataset.agente;
+
+  Swal.fire({
+    title: "¿Confirmar Envío?",
+    text: `Se registrará la venta para la OATC #${idOatc}`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#198754',
+    confirmButtonText: 'Sí, enviar a Caja'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      if (window.mostrarSpinner) window.mostrarSpinner();
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (window.ocultarSpinner) window.ocultarSpinner();
+          modalVentaCaja.hide();
+          actualizarVistasPostAccion(response.mensajeResolucion);
+          
+          Swal.fire({
+            title: '¡Venta Registrada!',
+            html: `Ticket Generado: <b>${response.ticket}</b><br>La venta ha sido enviada a caja con éxito.`,
+            icon: 'success',
+            confirmButtonText: 'Excelente'
+          });
+          
+          if (window.cargarAtenciones) window.cargarAtenciones();
+        })
+        .withFailureHandler(function(err) {
+          if (window.ocultarSpinner) window.ocultarSpinner();
+          Swal.fire("Error de Red", err.message, "error");
+        })
+        .procesarVentaCajaServidor(idOatc, CARRITO, clienteFinal, agenteFinal);
+    }
+  });
+};
+
+function obtenerListaProductosVenta() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hoja = ss.getSheetByName("PRODUCTOS"); 
+  const datos = hoja.getDataRange().getValues();
+  
+  return datos.slice(1).map(fila => ({
+    nombre: fila[0],
+    precio: parseFloat(fila[1]) || 0,
+    categoria: fila[2] || "General"
+  }));
+}
+
+window.abrirModalVentaCaja = abrirModalVentaCaja;
+window.filtrarProductos = filtrarProductos;
+window.renderizarCarrito = renderizarCarrito;
+window.obtenerListaProductosVenta = obtenerListaProductosVenta;
+</script>
+
+<!-- ========================================== -->
+<!-- DE: gestionCierreJS.html                   -->
+<!-- ========================================== -->
+<script>
+/**
+ * --- GESTIÓN DE CIERRE (CLOSE SYSTEM) ---
+ */
+function onSuccessPasarBorrador(responseMessage) {
+  console.log("DEBUG(Cliente/CerrarSistema): Cierre ejecutado con éxito.");
+
+  if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+
+  Swal.fire({
+    icon: 'success',
+    title: 'Sistema Cerrado',
+    text: responseMessage || 'Los datos han sido migrados al histórico correctamente.',
+    confirmButtonColor: '#3085d6'
+  });
+
+  if (typeof window.filtrarView === 'function') window.filtrarView(); 
+  if (typeof window.filtrarViewOATCPendientes === 'function') window.filtrarViewOATCPendientes();
+  if (typeof window.loadInfoDataListAgentesActivos === 'function') window.loadInfoDataListAgentesActivos();
+  if (typeof window.obtenerSiguienteNumeroOATC === 'function') window.obtenerSiguienteNumeroOATC();
+}
+
+function cerrarSistemaDiario() {
+  Swal.fire({
+    title: "¿Cerrar Sistema?",
+    text: "Esta acción pasará todos los registros actuales al histórico. Asegúrate de haber terminado la jornada.",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Sí, cerrar y archivar',
+    cancelButtonText: 'Cancelar'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+      google.script.run
+        .withSuccessHandler(onSuccessPasarBorrador)
+        .withFailureHandler(function(error) {
+          if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+          if (typeof window.onFailureConexion === 'function') {
+            window.onFailureConexion(error);
+          } else {
+            Swal.fire('Error Crítico', error.message, 'error');
+          }
+        })
+        .pasarBorrador();
+    }
+  });
+}
+
+// Exposición global
+window.cerrarSistemaDiario = cerrarSistemaDiario;
+</script>

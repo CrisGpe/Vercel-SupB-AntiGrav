@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <?!= include('onTopCSS'); ?>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/2.1.3/css/dataTables.bootstrap5.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-timepicker/1.14.0/jquery.timepicker.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@sweetalert2/theme-bootstrap-4/bootstrap-4.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css' rel='stylesheet' />
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js'></script>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/locales/es.js'></script>
+  </head>
+  <body>
+    <script>
+      window.addEventListener('error', function(e) {
+        console.error("DASHBOARD CRITICAL RUNTIME ERROR:", e.error);
+        if (window.Swal) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error de Inicialización del Dashboard',
+            text: e.message,
+            footer: 'Archivo: ' + e.filename + ' | Línea: ' + e.lineno
+          });
+        } else {
+          alert("ERROR EN DASHBOARD:\n" + e.message + "\nArchivo: " + e.filename + "\nLínea: " + e.lineno);
+        }
+      });
+    </script>
+    
+    <div id="loading-overlay">
+      <div class="spinner-custom"></div>
+      <div class="loading-text">PROCESANDO...</div>
+    </div>
+
+    <div class="font-size-control" onclick="cambiarTamanoFuente()" title="Cambiar tamaño de letra">
+      <span style="font-size: 10px;">A</span>
+      <span style="font-size: 14px; font-weight: bold;">A</span>
+      <span style="font-size: 18px;">A</span>
+    </div>
+
+    <div class="container-fluid px-4" id='displayLayout'>
+
+      <div class="row align-items-center mb-4 mt-3">
+        <div class="col-md-4" id="closebtn">
+          <button type="button" class="btn btn-success btn-sm" id="btnFidelizacion">
+            <i class="fas fa-heart"></i> Fidelización
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnCerrar">Cerrar</button>
+          <button class="btn btn-primary position-relative shadow-sm" id="btnAgendaHoy">
+            <i class="bi bi-calendar3"></i> Agenda de hoy
+            <span id="badgeNotificacionAgenda" 
+                  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">
+              0
+            </span>
+          </button>
+          <button type="button" class="btn btn-info btn-sm" id="btnAgentes">Agentes</button>
+        </div>
+        <div class="col-md-4 text-center">
+          <div id="my-clock" class="clock"></div>
+          <div id="date" class="date"></div>
+        </div>
+        <div class="col-md-4"></div>
+      </div>
+
+      <div class="row g-4 mb-3">
+        <div class="col-md-5">
+          <div class="modern-card">
+            <h3 class="card-title-custom">Ingreso</h3>
+            <div class="p-3">
+              <div class="form-floating mb-3">
+                <input class="form-control" list="datalistAgentes" id="dependientesDatalistAsistencia" placeholder="Agente">
+                <label for="dependientesDatalistAsistencia">Agente</label> 
+                <datalist id="datalistAgentes"></datalist>
+              </div>
+              <div class="d-grid gap-2">
+                <div class="btn-group btn-group-sm">
+                  <input type="button" value="Registrar entrada" class="btn btn-warning" id="btnActivarFicha"/>
+                  <input type="button" value="Registrar salida" class="btn btn-danger" id="btnDesactivarFicha"/>
+                  <input type="button" value="Refrigerio" class="btn btn-dark" id="btnRefrigerioFicha"/>
+                </div>
+                <div class="btn-group btn-group-sm">
+                  <input type="button" value="Psicólogo" class="btn btn-morado" id="btnPsicologo">
+                  <input type="button" value="Pásale la voz" class="btn btn-turquesa" id="btnPasVoz">
+                  <input type="button" value="salió del salón" class="btn btn-verde-custom" id="btnSalioSalon">
+                </div>
+                <input type="button" value="Pasar a otro salón" class="btn btn-outline-success btn-sm" id="btnPasarSalon">
+              </div>
+            </div>
+          </div>
+        </div>
+
+       <div class="col-md-7">
+        <div class="modern-card">
+          <form id="formOATC" onsubmit="return false;"> 
+            <div class="card-header-flex d-flex justify-content-between align-items-center px-2">
+              <h3 class="table-header-title mb-0 flex-shrink-1 text-truncate">Órdenes de atención</h3>
+              
+              <div class="header-inputs-container d-flex align-items-center gap-1">
+                <button type="button" class="btn btn-outline-primary btn-sm btn-historial-header" 
+                    onclick="buscarHistorialServidor(document.getElementById('clientesDatalistOATC').value)">
+                  <i class="fas fa-history"></i> <span class="d-none d-xl-inline">Historial</span>
+                </button>
+                
+                <div class="d-flex align-items-center header-data-box">
+                  <span class="label-header-display">N°:</span>
+                  <input type="text" id="floatingInputNumeroOATC" class="input-header-display" readonly>
+                </div>
+                
+                <div class="d-flex align-items-center header-data-box">
+                  <span class="label-header-display">Fecha:</span>
+                  <input type="text" id="datePicker" class="input-header-display" readonly value="07/01/2026">
+                </div>
+              </div>
+            </div>
+
+            <div class="p-3">
+              <div class="row g-2 mb-2">
+                <div class="col-md-8">
+                  <div class="form-floating">
+                    <input class="form-control" list="datalistClientes" id="clientesDatalistOATC" placeholder="Clientes">
+                    <label for="clientesDatalistOATC">Clientes</label>  
+                    <datalist id="datalistClientes"></datalist>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="form-floating">
+                    <input class="form-control" list="dataListTipoClientes" id="tipoClientesDatalist" placeholder="Tipo" required>
+                    <label for="tipoClientesDatalist">Tipo de cliente</label>
+                    <datalist id="dataListTipoClientes">
+                      <option value="Asesoría">Asesoría</option>
+                      <option value="Turno">Turno</option>
+                      <option value="Cliente">Cliente</option>
+                      <option value="Correccion">Corrección</option>
+                      <option value="TurnoNiño">Turno niño</option>
+                      <option value="TurnoCaballero">Turno caballero</option>
+                      <option value="Producto">Producto</option>
+                    </datalist>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                  <div class="form-floating">
+                    <input class="form-control" list="datalistAgentesA" id="agentesDisponiblesDatalist" placeholder="Agente" required>
+                    <label for="agentesDisponiblesDatalist">Agente Disponible</label>
+                    <datalist id="datalistAgentesA"></datalist> 
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-floating">
+                    <input class="form-control" list="dataListTipoATC" id="tipoOATCDatalist" placeholder="Atención" required>
+                    <label for="tipoOATCDatalist">Tipo de atención</label>
+                    <datalist id="dataListTipoATC">
+                      <option value="Corte">Corte, corte con diseño</option>
+                      <option value="Peinados">Cepillado, planchado, peinados</option>
+                      <option value="Color">Color</option>
+                      <option value="Alisados, laceados y botox">Alisados, laceados y botox</option>
+                      <option value="Tratamientos Capilares">Tratamientos Capilares</option>
+                      <option value="Manos y pies">Manos y pies</option>
+                      <option value="Servicios de cabina">Facial, masajes, etc.</option>
+                      <option value="Maquillaje">Maquillaje</option>
+                      <option value="Maquillaje y peinado">Maquillaje y peinado</option>
+                      <option value="Promocion">Promoción</option>
+                      <option value="Producto">Producto</option>
+                    </datalist>
+                  </div>
+                </div>
+              </div>
+
+              <div class="d-flex gap-2 justify-content-center">
+                <input type="button" value="Registrar Orden" class="btn btn-success px-4" id="btnRegistrarOATC"/>
+                <input type="button" value="Registrar Cita" class="btn btn-light border px-4" id="btnRegistrarCita"/>
+                <input type="button" value="Registrar Cliente" class="btn btn-warning px-4" id="btnRegistrarCliente"/>
+              </div>
+            </div>
+          </form> </div>
+      </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-md-5">
+          <div class="modern-card p-0 overflow-hidden">
+            <div class="table-header-container">
+              <p class="table-header-title">Disponibilidad y Turnos</p>
+              <div id="containerFiltroView" class="btn-group btn-filter-group">
+                <input type="button" value="Todos" class="btn btn-outline-dark" id="btnFiltrarView"/>
+                <input type="button" value="Estilismo" class="btn btn-outline-dark" id="btnFiltrarViewEstilismo"/>
+                <input type="button" value="Cosmiatria" class="btn btn-outline-dark" id="btnFiltrarViewCosmiatria"/>
+                <button type="button" id="btnMostrarHoraIngreso" class="btn btn-outline-secondary" onclick="window.toggleColumnaHoraIngreso()">🕒</button>
+              </div>
+            </div>
+            <div class="p-custom-table">
+              <table id="disponibilidadTurnosTabla" class="table table-sm w-100">
+                <thead>
+                  <tr><th>Q Cli</th><th>Q Tur</th><th>Ingreso</th><th>Salida</th><th>Agente</th><th>Estado</th><th>Act.</th></tr>
+                </thead>
+                <tbody id="disponibilidadTurnosTablaBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-7">
+          <div class="modern-card p-0 overflow-hidden">
+            <div class="table-header-container">
+              <p class="table-header-title">Listado de Atención</p>
+              <div id="containerFiltroViewOATC" class="btn-group btn-filter-group">
+                <input type="button" value="Citas" class="btn btn-outline-orange" id="btnFiltrarViewCitasHoy"/>
+                <input type="button" value="Pendientes" class="btn btn-outline-primary" onclick="window.filtrarViewOATCPendientes()"/>
+                <input type="button" value="Resueltas" class="btn btn-outline-success" onclick="window.filtrarViewOATCResueltas()"/>
+              </div>
+            </div>
+            <div class="p-custom-table">
+              <div id="vistaPrincipalTablas">
+                <div id="contenedorOATC">
+                  <table id="ordenesATCTabla" class="table table-sm w-100">
+                    <thead>
+                      <tr><th>Ord.</th><th>Hora</th><th>Cliente</th><th>Categoría</th><th>Agente</th><th>Acciones</th></tr>
+                    </thead>
+                    <tbody id="ordenesATCTablaBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template id="row-disponibilidadTurnosFilas">
+        <tr>
+          <td class="template-disponibilidadTurnosQClientes"></td>
+          <td class="template-disponibilidadTurnosQTurnos"></td>
+          <td class="template-disponibilidadTurnosHoraIngreso"></td>
+          <td class="template-disponibilidadTurnosHoraSalida"></td>
+          <td class="template-disponibilidadTurnosDependiente"></td>
+          <td class="template-disponibilidadTurnosEstado"></td>
+          <td class="template-disponibilidadTurnosUltAct"></td>
+        </tr>
+      </template>
+
+      <template id="ordenesATCFilas">
+        <tr>
+          <td class="ordenesATCID"></td><td class="ordenesATCHora"></td><td class="ordenesATCCliente"></td><td class="tipoOATC"></td>
+          <td class="ordenesATCAgente"></td><td class="ordenesATCAcciones"></td>
+      </template>
+      <?!= include('modalAgenda'); ?>
+      <?!= include('modales.html'); ?>
+      <?!= include('modalHistorialCliente'); ?>
+    </div> 
+
+    <!-- 🛠️ CONTENEDOR SECUNDARIO: PANEL DEL DESARROLLADOR (OCULTO POR DEFECTO) -->
+    <div id="displayDevLayout" style="display: none; padding: 20px;">
+      <?!= include('devPanelHtml'); ?>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/2.1.3/js/dataTables.js"></script>
+    <script src="https://cdn.datatables.net/2.1.3/js/dataTables.bootstrap5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-timepicker/1.14.0/jquery.timepicker.min.js"></script>
+    
+    <?!= include('relojJS.html'); ?>
+    <?!= include('gestionAccesibilidadJS'); ?>
+    <?!= include('gestionFichasJS.html'); ?>
+    <?!= include('gestionOrdenesATCJS.html'); ?>
+    <?!= include('gestionCierreJS.html'); ?>
+    <?!= include('gestionTablaTurnosViewsJS.html'); ?>
+    <?!= include('gestionTablaOATCViewJS.html'); ?>
+    <?!= include('gestionModalCitasJS.html'); ?>
+    <?!= include('gestionModalClienteJS.html'); ?>
+    <?!= include('gestionModalAsignacionAgenteJS.html'); ?>
+    <?!= include('gestionModalEliminarOATCJS.html'); ?>
+    <?!= include('gestionModalEdicionClienteJS.html'); ?>
+    <?!= include('gestionModalAgentesJS.html'); ?>
+    <?!= include('gestionModalEdicionTipoAtencionJS.html'); ?>
+    <?!= include('gestionAgendaModal.html'); ?>
+    <?!= include('gestionHistorialJS.html'); ?>
+    <?!= include('fidelizacionClienteJS'); ?>
+    <?!= include('gestionNoModalVentasCajaJS'); ?>
+    <?!= include('onLoadJS.html'); ?>
+
+  </body>
+</html>

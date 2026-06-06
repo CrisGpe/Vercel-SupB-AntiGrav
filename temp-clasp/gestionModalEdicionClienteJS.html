@@ -1,0 +1,165 @@
+<script>
+/**
+ * --- GESTIÓN DE MODAL: EDICIÓN DE CLIENTE (VERSIÓN EXTENDIDA) ---
+ * Este archivo gestiona la búsqueda dinámica y la actualización de datos 
+ * de clientes asociados a una Orden de Atención (OATC).
+ */
+(function() {
+    
+    // --- CONFIGURACIÓN DE CONSTANTES Y VARIABLES DE ÁMBITO ---
+    const ID_RESULTADOS_DIV = 'resultadosBusquedaClientes';
+    const ID_INPUT_CLIENTE = 'inputNuevoNombreCliente';
+    const ID_TITULO_MODAL = 'modalEdicionClienteTitulo';
+    const ID_MODAL_ELEMENT = 'modalEdicionCliente';
+    
+    let currentOatcIdToEdit = null;
+    let datosBusquedaClientesGlobal = []; 
+  
+    /**
+     * Filtra la lista de clientes en tiempo real mientras el usuario escribe.
+     * Realiza una búsqueda inclusiva en 5 campos: Nombre, Apellido, DNI, Email y Celular.
+     */
+    function filtrarListaClientes() {
+        const inputElement = document.getElementById(ID_INPUT_CLIENTE);
+        const resultadosDiv = document.getElementById(ID_RESULTADOS_DIV);
+        
+        if (!inputElement || !resultadosDiv) return;
+
+        const termino = inputElement.value.toLowerCase().trim();
+        resultadosDiv.innerHTML = ''; 
+
+        if (termino.length < 3) return; 
+
+        const resultados = datosBusquedaClientesGlobal.filter(cliente => {
+            const stringBusqueda = cliente.slice(0, 5).join(' ').toLowerCase();
+            return stringBusqueda.includes(termino);
+        });
+
+        const fragment = document.createDocumentFragment();
+        const resultadosLimitados = resultados.slice(0, 12);
+
+        if (resultadosLimitados.length === 0) {
+            const noRes = document.createElement('div');
+            noRes.className = 'list-group-item disabled text-muted';
+            noRes.textContent = 'No se encontraron coincidencias...';
+            fragment.appendChild(noRes);
+        } else {
+            resultadosLimitados.forEach(cliente => {
+                const nombreCompleto = `${cliente[0]} ${cliente[1]}`.trim();
+                const dni = cliente[2] || 'N/A';
+                const celular = cliente[4] || 'N/A';
+                
+                // Formato final requerido para la celda
+                const cadenaFormateada = `${nombreCompleto} | DNI:${dni} | CEL:${celular}`;
+                
+                const item = document.createElement('a');
+                item.href = 'javascript:void(0)';
+                item.className = 'list-group-item list-group-item-action animate__animated animate__fadeIn';
+                
+                item.innerHTML = `
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">${nombreCompleto}</h6>
+                    </div>
+                    <small class="text-muted">DNI: ${dni} | Cel: ${celular}</small>
+                `;
+                
+                // Acción al seleccionar: Ahora inyecta la cadena completa con el formato de filtrado
+                item.onclick = function(e) {
+                    e.preventDefault();
+                    inputElement.value = cadenaFormateada; // <--- Cambio clave aquí
+                    resultadosDiv.innerHTML = ''; 
+                    console.log("DEBUG: Cliente formateado seleccionado:", cadenaFormateada);
+                };
+                fragment.appendChild(item);
+            });
+        }
+        resultadosDiv.appendChild(fragment);
+    }
+
+    /**
+     * Abre el modal de edición y solicita los datos actuales de la OATC al servidor.
+     * @param {string} oatcId - El ID de la Orden de Atención.
+     */
+    function abrirModalEdicionCliente(oatcId) {
+        if (!oatcId) {
+            Swal.fire('Error', 'No se detectó un ID de orden válido.', 'error');
+            return;
+        }
+        currentOatcIdToEdit = oatcId;
+        if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+        
+        google.script.run
+            .withFailureHandler(function(err) {
+                if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+                window.onFailureConexion(err);
+            })
+            .withSuccessHandler(showModalWithOATCData)
+            .obtenerDatosOATCparaEdicionCliente(oatcId);
+    }
+
+    /**
+     * Procesa la respuesta del servidor y despliega el modal de Bootstrap.
+     * @param {Object} datosOATC - Contiene clienteNombre y listaClientes.
+     */
+    function showModalWithOATCData(datosOATC) {
+        if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+
+        const modalElement = document.getElementById(ID_MODAL_ELEMENT);
+        const inputCliente = document.getElementById(ID_INPUT_CLIENTE); 
+        const tituloModal = document.getElementById(ID_TITULO_MODAL);
+        
+        datosBusquedaClientesGlobal = datosOATC.listaClientes || [];
+        inputCliente.value = datosOATC.clienteNombre || '';
+        if (tituloModal) tituloModal.textContent = `Editar Cliente - OATC #${currentOatcIdToEdit}`;
+
+        const modalInstance = new bootstrap.Modal(modalElement);
+        modalInstance.show();
+
+        setTimeout(() => {
+            inputCliente.focus();
+            inputCliente.select();
+        }, 500);
+    }
+
+    /**
+     * Valida y envía la actualización del nombre del cliente al servidor.
+     */
+    function guardarEdicionCliente() {
+        if (!currentOatcIdToEdit) return;
+
+        const inputCliente = document.getElementById(ID_INPUT_CLIENTE);
+        const nuevoNombreFormateado = inputCliente ? inputCliente.value.trim() : '';
+
+        if (!nuevoNombreFormateado || nuevoNombreFormateado.length < 5) {
+            Swal.fire({ icon: 'warning', title: 'Dato insuficiente', text: 'Seleccione un cliente de la lista para asegurar el formato correcto.' });
+            return;
+        }
+
+        if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+        google.script.run
+            .withSuccessHandler(function(respuestaServidor) {
+                if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+                const modalEl = document.getElementById(ID_MODAL_ELEMENT);
+                const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if (modalInstance) modalInstance.hide();
+
+                Swal.fire({ icon: 'success', title: 'Cambio Guardado', text: 'El cliente ha sido actualizado con el formato de filtrado.', timer: 2500, showConfirmButton: false });
+
+                if (window.actualizarVistasPostAccion) window.actualizarVistasPostAccion();
+            })
+            .withFailureHandler(function(error) {
+                if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+                window.onFailureConexion(error);
+            })
+            .actualizarNombreClienteOATC(currentOatcIdToEdit, nuevoNombreFormateado);
+    }
+
+    // --- EXPOSICIÓN GLOBAL CONTROLADA ---
+    window.abrirModalEdicionCliente = abrirModalEdicionCliente;
+    window.guardarEdicionCliente = guardarEdicionCliente;
+    window.filtrarListaClientes = filtrarListaClientes;
+
+})();
+// --- FIN DEL MÓDULO GESTIÓN EDICIÓN CLIENTE ---
+</script>

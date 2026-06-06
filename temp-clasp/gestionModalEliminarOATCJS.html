@@ -1,0 +1,133 @@
+<script>
+/**
+ * --- GESTIÓN DE MODAL: ELIMINAR OATC ---
+ * Maneja el borrado seguro de órdenes con requerimiento de justificación.
+ */
+(function() {
+
+  window.currentOatcIdToEliminate = '';
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const modalElement = document.getElementById('modalEliminarOATC');
+    if (modalElement) {
+      eliminarOATCModal = new bootstrap.Modal(modalElement);
+    }
+  });
+
+  /**
+   * Prepara el modal para eliminar una orden específica.
+   */
+  function abrirModalEliminarOATC(oatcId) {
+    console.log("DEBUG: Intentando abrir modal para ID:", oatcId); // <-- Mira esto en la consola
+    if (!oatcId) {
+        console.error("Error: ID no recibido en abrirModalEliminarOATC");
+        return;
+    }
+
+    window.currentOatcIdToEliminate = oatcId;
+    
+    // UI Updates
+    const displayId = document.getElementById('eliminarOATCIdDisplay');
+    const inputHidden = document.getElementById('hiddenOatcIdEliminar');
+    const inputJustificacion = document.getElementById('justificacionEliminacionInput');
+
+    if (displayId) displayId.textContent = `ID ${oatcId}`;
+    if (inputHidden) inputHidden.value = oatcId;
+    if (inputJustificacion) inputJustificacion.value = ''; 
+
+    // OBTENCIÓN SEGURA DE LA INSTANCIA
+    const modalElement = document.getElementById('modalEliminarOATC');
+    if (modalElement) {
+      const modalInstance = bootstrap.Modal.getOrCreateInstance(modalElement);
+      modalInstance.show();
+    } else {
+      console.error("Error: No se encontró el elemento HTML 'modalEliminarOATC'");
+    }
+  }
+
+  function cerrarModalEliminarOATC() {
+    const modalElement = document.getElementById('modalEliminarOATC');
+    if (modalElement) {
+      const modalInstance = bootstrap.Modal.getInstance(modalElement);
+      if (modalInstance) modalInstance.hide();
+    }
+  }
+  
+  /**
+   * Procesa la eliminación tras la confirmación del servidor.
+   */
+  function onSuccessEliminacion(respuesta) {
+    // 1. Apagar spinner de inmediato
+    if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+    
+    // 2. Cerrar el modal
+    cerrarModalEliminarOATC();
+
+    // 3. Lanzar el éxito (timer corto para no bloquear)
+    Swal.fire({
+      icon: 'success',
+      title: 'Registro Eliminado',
+      text: respuesta || 'La orden ha sido removida correctamente.',
+      timer: 1500,
+      showConfirmButton: false
+    });
+
+    // 4. Refrescar la tabla en segundo plano (silencioso)
+    if (window.actualizarVistasPostAccion) {
+      window.actualizarVistasPostAccion(null, true); // true para modo silencioso
+    }
+  }
+
+  /**
+   * Valida la justificación y envía la orden de eliminación.
+   */
+  function confirmarEliminacionOATC() {
+    const oatcId = window.currentOatcIdToEliminate;
+    const justificacionInput = document.getElementById('justificacionEliminacionInput');
+    const justificacion = justificacionInput ? justificacionInput.value.trim() : '';
+
+    // 1. Validación de Justificación con SweetAlert2
+    if (!justificacion || justificacion.length < 5) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Justificación Requerida',
+        text: 'Por favor, ingrese un motivo válido (mínimo 5 caracteres) para eliminar esta orden.',
+        confirmButtonColor: '#d33'
+      });
+      return;
+    }
+
+    // 2. Doble Confirmación de Seguridad
+    Swal.fire({
+      title: "¿Estás completamente seguro?",
+      text: `Vas a eliminar la OATC ${oatcId}. Esta acción quedará registrada en el historial.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar definitivamente',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        // feedback visual
+        if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+        // 3. Llamada al servidor
+        google.script.run
+          .withSuccessHandler(onSuccessEliminacion)
+          .withFailureHandler(err => {
+            if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+            window.onFailureConexion(err);
+          })
+          .eliminarOATC(oatcId, justificacion); 
+      }
+    });
+  }
+
+  // --- EXPOSICIÓN GLOBAL ---
+  window.abrirModalEliminarOATC = abrirModalEliminarOATC;
+  window.cerrarModalEliminarOATC = cerrarModalEliminarOATC;
+  window.confirmarEliminacionOATC = confirmarEliminacionOATC;
+  
+})();
+</script>

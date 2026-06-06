@@ -1,0 +1,182 @@
+<script>
+/**
+ * GESTIÓN DE TABLA TURNOS - VERSIÓN UNIFICADA (ÍNDICES ORIGINALES)
+ */
+var turnosDataTableInstance = null; 
+
+(function() {
+  // 💡 MANTENEMOS TUS ÍNDICES ORIGINALES (Basados en A:M)
+  const T_INDEX_DEPENDIENTE = 1;    // Col B
+  const T_INDEX_HORA_INGRESO = 2;   // Col C
+  const T_INDEX_HORA_SALIDA = 5;    // Col F
+  const T_INDEX_Q_TURNOS = 6;       // Col G
+  const T_INDEX_Q_CLIENTES = 7;     // Col H
+  const T_INDEX_ESTADO_TEXTO = 8;   // Col I
+  const T_INDEX_ESTADO_NUM = 9;     // Col J
+  const T_INDEX_CATEGORIA = 10;     // Col K
+  const T_INDEX_ULT_ACT = 12;       // Col M
+
+  // --- 1. MOTOR DE RENDERIZADO CORREGIDO ---
+  function renderizarTablaTurnos(turnosAsistencias) {
+    if (!Array.isArray(turnosAsistencias)) return;
+
+
+
+    const tableBody = document.getElementById("disponibilidadTurnosTablaBody");
+    const template = document.getElementById("row-disponibilidadTurnosFilas");
+    const tablaCompleta = document.getElementById("disponibilidadTurnosTabla");
+
+    if (!tableBody || !template || !tablaCompleta) return; 
+
+    // B. Limpieza de DataTables
+    if (turnosDataTableInstance) {
+        turnosDataTableInstance.destroy(); 
+        turnosDataTableInstance = null;
+    }
+
+    // --- FILTRO DE PERSONAL OPERATIVO ---
+    const personalOperativo = turnosAsistencias.filter(fila => {
+      // Usamos el índice de CATEGORÍA (Columna K = 10)
+      const categoria = String(fila[T_INDEX_CATEGORIA] || "").toLowerCase();
+      return categoria.includes("estilismo") || categoria.includes("cosmiatr");
+    });
+
+    tableBody.innerHTML = ''; 
+    const fragment = document.createDocumentFragment();
+    
+    personalOperativo.forEach(filaDeDatos => {
+      const trFragment = template.content.cloneNode(true);
+      const filaTR = trFragment.querySelector("tr");
+      const estadoTexto = filaDeDatos[T_INDEX_ESTADO_TEXTO];
+
+      // Aplicar clases de estado para colores
+      if (estadoTexto && filaTR) {
+        const estadoLimpio = String(estadoTexto).trim().toLowerCase().replace(/\s/g, '-');
+        filaTR.classList.add('estado-' + estadoLimpio); 
+      }
+
+      // Mapeo manual de celdas (Evita que los datos se desplacen)
+      trFragment.querySelector(".template-disponibilidadTurnosQClientes").textContent = filaDeDatos[T_INDEX_Q_CLIENTES]; 
+      trFragment.querySelector(".template-disponibilidadTurnosQTurnos").textContent = filaDeDatos[T_INDEX_Q_TURNOS]; 
+      trFragment.querySelector(".template-disponibilidadTurnosHoraIngreso").textContent = filaDeDatos[T_INDEX_HORA_INGRESO];
+      trFragment.querySelector(".template-disponibilidadTurnosHoraSalida").textContent = filaDeDatos[T_INDEX_HORA_SALIDA]; 
+      
+      const depName = filaDeDatos[T_INDEX_DEPENDIENTE];
+      const categoria = filaDeDatos[T_INDEX_CATEGORIA] || "General";
+      const badgeColor = String(categoria).toLowerCase().includes("estilismo") ? "bg-primary" : "bg-info text-dark";
+      const filaJSON = encodeURIComponent(JSON.stringify(filaDeDatos));
+      
+      trFragment.querySelector(".template-disponibilidadTurnosDependiente").innerHTML = `
+        <div class="d-flex flex-column align-items-center justify-content-center text-center py-1">
+          <a href="#" class="stylist-hours-link text-decoration-none fw-bold stylist-name-link mb-1" data-fila="${filaJSON}" style="font-size: 1.05rem; letter-spacing: 0.3px;">
+            ${depName}
+          </a>
+          <span class="badge ${badgeColor}" style="font-size: 0.85rem; font-weight: 700; padding: 5px 12px; border-radius: 50px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: inline-block; white-space: nowrap;">${categoria}</span>
+        </div>
+      `;
+
+      trFragment.querySelector(".template-disponibilidadTurnosEstado").innerHTML = `<span class="template-disponibilidadTurnosEstado-badge">${estadoTexto}</span>`; 
+      trFragment.querySelector(".template-disponibilidadTurnosUltAct").textContent = filaDeDatos[T_INDEX_ULT_ACT]; 
+      
+      fragment.appendChild(trFragment); 
+    });
+    tableBody.appendChild(fragment); 
+ 
+    // Event delegation on table body for hours breakdown modal
+    const bodyEl = document.getElementById("disponibilidadTurnosTablaBody");
+    if (bodyEl && !bodyEl.dataset.hasListener) {
+      bodyEl.dataset.hasListener = "true";
+      bodyEl.addEventListener("click", function(e) {
+        const link = e.target.closest(".stylist-hours-link");
+        if (link) {
+          e.preventDefault();
+          try {
+            const data = JSON.parse(decodeURIComponent(link.getAttribute("data-fila")));
+            document.getElementById("desgloseStylistNombre").textContent = data[1];
+            
+            // Cargar dinámicamente la especialidad en el modal
+            const badgeModal = document.getElementById("desgloseStylistBadge");
+            if (badgeModal) {
+              const cat = data[10] || "General";
+              badgeModal.textContent = cat;
+              const isEstilismo = String(cat).toLowerCase().includes("estilismo");
+              badgeModal.className = `badge fs-6 py-2 px-3 rounded-pill ${isEstilismo ? 'bg-primary' : 'bg-info text-dark'}`;
+              badgeModal.style.textTransform = "uppercase";
+              badgeModal.style.fontWeight = "700";
+              badgeModal.style.letterSpacing = "0.5px";
+              badgeModal.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
+            }
+            
+            document.getElementById("desgloseEntrada").textContent = data[2] || "-";
+            document.getElementById("desgloseRefInicio").textContent = data[3] || "-";
+            document.getElementById("desgloseRefFin").textContent = data[4] || "-";
+            document.getElementById("desgloseSalida").textContent = data[5] || "-";
+            
+            const modal = new bootstrap.Modal(document.getElementById('modalDesgloseHoras'));
+            modal.show();
+          } catch(err) {
+            console.error("Error mostrando desglose de horas:", err);
+          }
+        }
+      });
+    }
+
+    // C. Re-inicialización de DataTable
+    turnosDataTableInstance = new DataTable(tablaCompleta, {
+        searching: false,
+        paging: false,
+        info: false,
+        order: [],
+        language: { url: 'https://cdn.datatables.net/plug-ins/2.1.3/i18n/es-ES.json' },
+        columnDefs: [
+          { target: [2, 3], visible: false } // Oculta Ingreso y Salida por defecto
+        ]
+    });
+  }
+
+  // --- 2. FUNCIONES DE FILTRADO (CON TUS NOMBRES REALES EN .GS) ---
+  function ejecutarLlamada(metodo) {
+    if (window.mostrarCargando) window.mostrarCargando();
+    google.script.run
+      .withSuccessHandler(res => {
+        renderizarTablaTurnos(res);
+        if (window.ocultarCargando) window.ocultarCargando();
+      })
+      .withFailureHandler(window.onFailureConexion)
+      [metodo]();
+  }
+
+  window.filtrarView = () => ejecutarLlamada('obtenerFichasRegistradas');
+  window.filtrarViewEstilismo = () => ejecutarLlamada('obtenerFichasRegistradasHoyEstilismo');
+  window.filtrarViewCosmiatria = () => ejecutarLlamada('obtenerFichasRegistradasHoyCosmiatria');
+  window.filtrarViewOtros = () => ejecutarLlamada('obtenerFichasRegistradasHoyOtros');
+
+  // --- 3. UTILIDADES ---
+  window.toggleColumnaHoraIngreso = function() {
+  if (turnosDataTableInstance) {
+    // 1. Obtenemos las columnas por su posición física en el HTML (2 y 3)
+    const colIngreso = turnosDataTableInstance.column(2); 
+    const colSalida = turnosDataTableInstance.column(3);
+    
+    // 2. Comprobamos si la de ingreso es visible actualmente
+    const actualmenteVisible = colIngreso.visible();
+
+    // 3. Cambiamos la visibilidad de ambas al estado contrario
+    colIngreso.visible(!actualmenteVisible);
+    colSalida.visible(!actualmenteVisible);
+
+    // 4. Ajustamos el estilo del botón
+    const boton = document.getElementById("btnMostrarHoraIngreso");
+    if (boton) {
+      // Si antes era visible (isVisible=true), ahora está oculto -> ponemos contorno
+      // Si antes estaba oculto, ahora es visible -> lo ponemos sólido
+      boton.classList.toggle('btn-outline-secondary', actualmenteVisible);
+      boton.classList.toggle('btn-secondary', !actualmenteVisible);
+    }
+  }
+};
+
+  window.renderizarTablaTurnos = renderizarTablaTurnos;
+
+})();
+</script>

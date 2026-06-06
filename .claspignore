@@ -1,0 +1,9 @@
+# Ignorar directorio de código descartado para que clasp no lo suba a Google Apps Script
+legacy_discarded/**
+temp-clasp/**
+.git/**
+node_modules/**
+.clasp.json
+.claspignore
+package.json
+package-lock.json

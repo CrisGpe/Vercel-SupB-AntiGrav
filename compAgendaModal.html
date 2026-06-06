@@ -1,0 +1,1160 @@
+<!-- Modal Personalizado para Mostrar Agenda Modernizado -->
+<div id="agendaModal" class="modal fade" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden; background: #fdfbfb;">
+      
+      <!-- Premium Glassmorphic Header -->
+      <div class="modal-header px-4 py-3 border-0" style="background: linear-gradient(135deg, #111 0%, #2c3e50 100%);">
+        <h5 class="modal-title fs-5 fw-bold text-white d-flex align-items-center">
+          <i class="bi bi-calendar3-event fs-4 me-2 text-warning"></i>
+          Centro de Eventos y Notas
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <div class="modal-body p-4">
+        
+        <!-- Formulario: Registrar en Agenda (Modernizado) -->
+        <div id="seccionNuevoEvento" class="card mb-4 d-none border-0 shadow-sm" style="border-radius: 12px; background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border: 1px solid rgba(40,167,69,0.15);">
+          <div class="card-header bg-success bg-gradient text-white py-2 fw-bold small text-uppercase tracking-wider" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+            <i class="bi bi-plus-circle me-1"></i> Registrar en Agenda
+          </div>
+          <input type="hidden" id="regId" value="">
+          <div class="card-body py-3">
+            <div class="row g-3">
+              <div class="col-md-3">
+                <label class="label-header-display d-block mb-1 text-muted small fw-semibold">Tipo de Evento</label>
+                <select id="regTipo" class="form-select form-select-sm border-2" style="border-radius: 8px;" onchange="window.toggleTipoFormularioAgenda()">
+                  <option value="Tarea">📝 Tarea / Pendiente</option>
+                  <option value="Cumpleaños">🎂 Cumpleaños</option>
+                  <option value="Capacitación">🎓 Capacitación</option>
+                  <option value="Producto">🛍️ Venta / Producto</option>
+                  <option value="Ausencia">✈️ Ausencia Staff</option>
+                </select>
+              </div>
+
+              <!-- Contenedores normales -->
+              <div class="col-md-3" id="contenedorPrioridad">
+                <label class="label-header-display d-block mb-1 text-muted small fw-semibold">Prioridad</label>
+                <select id="regPrioridad" class="form-select form-select-sm border-2" style="border-radius: 8px;">
+                  <option value="Baja">🟢 Baja</option>
+                  <option value="Media" selected>🟡 Media</option>
+                  <option value="Alta">🔴 Alta</option>
+                </select>
+              </div>
+
+              <div class="col-md-6" id="contenedorDescripcion">
+                <label class="label-header-display d-block mb-1 text-muted small fw-semibold">Descripción del Evento</label>
+                <div class="input-group">
+                  <input type="text" id="regDesc" class="form-control form-control-sm border-2" style="border-top-left-radius: 8px; border-bottom-left-radius: 8px;" placeholder="Ej: Capacitación ventas">
+                  <button class="btn btn-success bg-gradient px-4 btn-sm fw-bold" style="border-top-right-radius: 8px; border-bottom-right-radius: 8px;" onclick="guardarNuevaNota()">
+                    <i class="bi bi-save me-1"></i> Guardar
+                  </button>
+                </div>
+              </div>
+
+              <!-- Contenedores especiales para Ausencias -->
+              <div class="col-md-9 d-none" id="contenedorAusenciaStaff">
+                <div class="row g-2">
+                  <div class="col-md-4">
+                    <label class="label-header-display d-block mb-1 text-muted small fw-semibold">Colaborador</label>
+                    <select id="regAgenteAbsence" class="form-select form-select-sm border-2" style="border-radius: 8px;"></select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="label-header-display d-block mb-1 text-muted small fw-semibold">Motivo</label>
+                    <select id="regMotivoAbsence" class="form-select form-select-sm border-2" style="border-radius: 8px;">
+                      <option value="Vacaciones">✈️ Vacaciones</option>
+                      <option value="Asunto Médico">🩺 Asunto Médico</option>
+                      <option value="Tema Personal">👤 Tema Personal</option>
+                      <option value="Otros">Otros</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="label-header-display d-block mb-1 text-muted small fw-semibold">Fecha Retorno / Fin</label>
+                    <input type="date" id="regFechaFinAbsence" class="form-control form-control-sm border-2" style="border-radius: 8px;">
+                  </div>
+                  <div class="col-md-2 d-flex align-items-end">
+                    <button class="btn btn-success bg-gradient btn-sm w-100 fw-bold py-1 shadow-sm" style="border-radius: 8px;" onclick="window.guardarAusenciaStaff()">
+                      <i class="bi bi-save"></i> Guardar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra de Herramientas y Filtros -->
+        <div class="row align-items-center mb-4 g-3">
+          <div class="col-md-auto col-12 text-center text-md-start">
+            <div class="btn-group p-1 bg-light rounded-pill shadow-sm" role="group">
+              <button class="btn btn-sm px-3 rounded-pill active border-0 py-1.5 transition-all" id="btnVistaCalendario" onclick="cambiarVistaAgenda('calendario')" style="font-weight: 600;">
+                <i class="bi bi-calendar-event me-1"></i> Calendario
+              </button>
+              <button class="btn btn-sm px-3 rounded-pill border-0 py-1.5 transition-all" id="btnVistaTabla" onclick="cambiarVistaAgenda('tabla')" style="font-weight: 600;">
+                <i class="bi bi-list-stars me-1"></i> Lista
+              </button>
+            </div>
+          </div>
+
+          <div class="col">
+            <div id="busquedaAgendaContainer" class="d-none">
+              <div class="input-group shadow-sm" style="border-radius: 30px; overflow: hidden; border: 1px solid rgba(0,0,0,0.08);">
+                <span class="input-group-text bg-white border-0 ps-3">
+                  <i class="bi bi-search text-muted fs-6"></i>
+                </span>
+                <input type="text" id="inputBuscarAgenda" class="form-control border-0 py-2 small ps-1" 
+                       placeholder="Filtrar eventos o nombres de colaboradores..." onkeyup="filtrarTablaAgenda()">
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-auto col-12 text-center text-md-end">
+            <button class="btn btn-dark bg-gradient px-4 rounded-pill shadow-sm border-0 d-inline-flex align-items-center gap-1 hover-scale transition-all" onclick="toggleFormEvento()" style="font-weight: 600;">
+              <i class="bi bi-plus-lg"></i>
+              <span>Nuevo Registro</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Contenedor del Calendario -->
+        <div id="contenedorCalendario" class="modern-card p-3 shadow-sm border bg-white" style="border-radius: 16px;">
+          <div id="calendar"></div> 
+        </div>
+
+        <!-- Contenedor de la Lista -->
+        <div id="contenedorTablaAgenda" class="d-none mt-2">
+          
+          <!-- Encabezado de la lista: Registros a mostrar y búsqueda rápida -->
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3 bg-white p-3 rounded-4 shadow-sm border border-light">
+            <div class="d-flex align-items-center gap-2">
+              <span class="small text-muted fw-semibold">Mostrar</span>
+              <select id="selectPageLengthAgenda" class="form-select form-select-sm border-2 px-2" style="width: 80px; border-radius: 8px; font-weight: bold; color: #444;" onchange="window.onChangeLengthAgenda()">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+              </select>
+              <span class="small text-muted fw-semibold">registros</span>
+            </div>
+            
+            <div class="d-flex align-items-center gap-2">
+              <span class="small text-muted fw-semibold">Buscar:</span>
+              <input type="text" id="inputBuscarAgendaCard" class="form-control form-control-sm border-2 px-3" style="width: 240px; border-radius: 20px;" placeholder="Buscar en listado..." onkeyup="window.onSearchAgenda()">
+            </div>
+          </div>
+
+          <div id="bodyTablaAgenda" class="d-flex flex-column gap-3">
+            <!-- Cargado Dinámicamente con plantillaFilaAgenda -->
+          </div>
+
+          <!-- Pie de la lista: Resumen de registros y paginación -->
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mt-4 pt-3 border-top border-light">
+            <div id="infoPaginacionAgenda" class="small text-muted fw-bold">
+              Mostrando 0 a 0 de 0 registros
+            </div>
+            <nav aria-label="Navegación de Agenda">
+              <ul id="ulPaginacionAgenda" class="pagination pagination-sm m-0 gap-1">
+                <!-- Botones inyectados dinámicamente -->
+              </ul>
+            </nav>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Plantilla para Fila / Tarjeta de Agenda (Modernizada) -->
+<template id="plantillaFilaAgenda">
+  <div class="agenda-item-card p-3 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 rounded-4 border-start border-4 bg-white shadow-sm transition-all" style="border-left-color: #3498db;">
+    <div class="d-flex align-items-center gap-3">
+      <!-- Date Badge pill -->
+      <div class="date-badge-pill p-2 px-3 rounded-3 text-center border" style="min-width: 90px; background: #f8f9fa;">
+        <span class="celda-fecha small fw-bold text-dark d-block"></span>
+      </div>
+      <div>
+        <span class="badge celda-prioridad mb-1" style="font-size: 0.7rem; font-weight: 600;"></span>
+        <div class="celda-descripcion fw-semibold text-dark text-wrap small" style="max-width: 500px;"></div>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-3 justify-content-between justify-content-md-end ms-md-auto">
+      <div class="status-indicator">
+        <span class="celda-estado badge rounded-pill px-3 py-1 fw-bold text-uppercase small" style="font-size: 0.65rem; background: #e8f5e9; color: #2e7d32;"></span>
+      </div>
+      <div class="contenedor-accion d-flex gap-2">
+        <!-- Botones de Acción Inyectados -->
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- Premium Styling for the modernized components -->
+<style>
+#agendaModal {
+  font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.transition-all {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.hover-scale:hover {
+  transform: scale(1.03);
+}
+/* Style Segmented Tabs Button */
+.btn-group .btn {
+  color: #555;
+  background-color: transparent;
+}
+.btn-group .btn:hover {
+  color: #111;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+.btn-group .btn.active {
+  background-color: #111 !important;
+  color: #fff !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Beautiful Agenda Cards styling */
+.agenda-item-card {
+  border-left-style: solid;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+.agenda-item-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Button override inside cards */
+.contenedor-accion .btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50% !important;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border-width: 1.5px;
+  transition: all 0.2s ease;
+}
+.contenedor-accion .btn:hover {
+  transform: scale(1.1);
+}
+
+/* FullCalendar styling tweaks */
+.fc .fc-toolbar-title {
+  font-size: 1.25rem !important;
+  font-weight: 700;
+  color: #2c3e50;
+  text-transform: capitalize;
+}
+.fc .fc-button-primary {
+  background-color: #2c3e50 !important;
+  border-color: #2c3e50 !important;
+}
+.fc .fc-button-primary:hover {
+  background-color: #1a252f !important;
+  border-color: #1a252f !important;
+}
+.fc .fc-button-active {
+  background-color: #111 !important;
+  border-color: #111 !important;
+}
+.fc-daygrid-event {
+  border-radius: 6px !important;
+  padding: 2px 5px !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+}
+</style>
+
+<script>
+/**
+ * GESTIÓN DE AGENDA Y CALENDARIO - VERSIÓN SIN WHATSAPP
+ */
+let calendar; 
+
+// 1. FUNCIONES DE APERTURA Y CARGA
+window.mostrarAgendaDelMesEnModal = function() {
+  const modalEl = document.getElementById('agendaModal');
+  if (!modalEl) return;
+  
+  // Registrar el listener antes de mostrar para asegurar que Bootstrap lo dispare
+  modalEl.removeEventListener('shown.bs.modal', ejecutarCargaAgenda);
+  modalEl.addEventListener('shown.bs.modal', ejecutarCargaAgenda);
+  
+  const instancia = bootstrap.Modal.getOrCreateInstance(modalEl);
+  instancia.show();
+};
+
+function ejecutarCargaAgenda() {
+  console.log("DEBUG: Modal abierto, cargando datos unificados...");
+  cargarDatosDesdeGoogleSheets();
+  inicializarCalendario();
+}
+
+// 2. INICIALIZACIÓN DE FULLCALENDAR
+function inicializarCalendario() {
+  const calendarEl = document.getElementById('calendar');
+  if (!calendarEl) return;
+
+  if (calendar) {
+    calendar.updateSize();
+    calendar.refetchEvents();
+    return;
+  }
+
+  calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    locale: 'es',
+    height: 500,
+    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
+    eventClick: function(info) {
+      var ev = info.event;
+      var props = ev.extendedProps;
+
+      if (props.tipo === 'CitaAgrupada') {
+        mostrarDetalleCitas(props.detalles, ev.startStr);
+      } 
+      else if (props.tipo === 'Cumpleaños' && !ev.id.includes("AGENTE")) {
+        var nombreCliente = ev.title.replace('🎂 Cumpleaños: ', '').replace('Cliente: ', '');
+        var tel = props.telefono || "";
+        
+        var mensaje = encodeURIComponent('¡Hola ' + nombreCliente + '! ✨ De parte de todo el equipo de GLOSS, te deseamos un muy feliz cumpleaños. Que pases un día increíble. 🎂🎉');
+        var urlWa = 'https://wa.me/' + tel + '?text=' + mensaje;
+
+        // Usamos concatenación estándar para evitar el error de "Unexpected token"
+        var htmlContenido = '<div class="text-center">' +
+                            '<p>🎁 <strong>' + nombreCliente + '</strong> está de cumpleaños hoy.</p>';
+        
+        if (tel) {
+          htmlContenido += '<a href="' + urlWa + '" target="_blank" class="btn btn-success mt-3">' +
+                           '<i class="fab fa-whatsapp"></i> Enviar Saludo por WhatsApp' +
+                           '</a>';
+        } else {
+          htmlContenido += '<p class="text-muted small"><i>No hay teléfono registrado para este cliente</i></p>';
+        }
+        
+        htmlContenido += '</div>';
+
+        Swal.fire({
+          title: '¡Es su cumpleaños!',
+          html: htmlContenido,
+          showConfirmButton: false,
+          showCloseButton: true
+        });
+      } 
+      else {
+        Swal.fire({
+          title: 'Detalle del Evento',
+          text: ev.title,
+          icon: 'info',
+          confirmButtonColor: ev.backgroundColor || '#3085d6'
+        });
+      }
+    },
+    events: function(fetchInfo, successCallback) {
+      console.log("CALENDARIO: Solicitando datos al servidor...");
+
+      google.script.run.withSuccessHandler(function(resRaw) {
+        try {
+          const res = JSON.parse(resRaw);
+          const eventosAgenda = res.eventosAgenda || [];
+          const cumples = res.cumples || [];
+          const cumplesStaff = res.cumplesStaff || [];
+          const citas = res.citas || [];
+
+          const listaBase = eventosAgenda
+            .concat(cumples)
+            .concat(cumplesStaff)
+            .map(ev => {
+              if (!ev || !ev.fecha) return null;
+              const fechaFinal = transformarFechaParaCalendario(ev.fecha);
+              if (!fechaFinal) return null;
+              
+              let bgColor = '#f39c12'; // default color
+              if (ev.tipo === 'Ausencia') {
+                bgColor = '#e74c3c'; // Rojo para ausencias
+              } else if (ev.id && ev.id.includes("AGENTE")) {
+                bgColor = '#9b59b6'; // Morado para cumples staff
+              }
+              
+              return {
+                id: ev.id,
+                title: ev.descripcion,
+                start: fechaFinal,
+                backgroundColor: bgColor,
+                extendedProps: { 
+                  tipo: ev.tipo, 
+                  telefono: ev.telefono 
+                }
+              };
+            })
+            .filter(Boolean);
+
+          const citasAgrupadas = {};
+          citas.forEach(c => {
+            if (!c || !c.fecha) return;
+            const fechaIso = transformarFechaParaCalendario(c.fecha);
+            if (!fechaIso) return;
+            if (!citasAgrupadas[fechaIso]) citasAgrupadas[fechaIso] = [];
+            citasAgrupadas[fechaIso].push(c);
+          });
+
+          const eventosCitas = Object.keys(citasAgrupadas).map(fechaIso => ({
+            title: `📅 ${citasAgrupadas[fechaIso].length} Citas`,
+            start: fechaIso,
+            backgroundColor: '#28a745',
+            extendedProps: { tipo: 'CitaAgrupada', detalles: citasAgrupadas[fechaIso] }
+          }));
+
+          successCallback(listaBase.concat(eventosCitas));
+        } catch (e) {
+          console.error("Error al parsear eventos de calendario:", e);
+          successCallback([]);
+        }
+      }).obtenerDatosAgendaCompletos();
+    }
+  });
+  calendar.render();
+}
+
+// 3. CARGA DE TABLA DESDE GOOGLE SHEETS CON PAGINACIÓN PREMIUM
+window.AGENDA_ITEMS_ALL = [];
+window.AGENDA_ITEMS_FILTERED = [];
+window.AGENDA_CURRENT_PAGE = 1;
+
+function cargarDatosDesdeGoogleSheets() {
+  const tbody = document.getElementById('bodyTablaAgenda');
+  const template = document.getElementById('plantillaFilaAgenda');
+  if (!tbody || !template) return;
+
+  tbody.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-dark"></div><div class="small mt-2 text-muted fw-semibold">Cargando eventos...</div></div>';
+
+  google.script.run.withSuccessHandler(function(resRaw) {
+    try {
+      const res = JSON.parse(resRaw);
+      const netas = res.eventosAgenda || [];
+      const cumples = res.cumples || [];
+      const cumplesStaff = res.cumplesStaff || [];
+      const citas = res.citas || [];
+
+      const citasAdaptadas = citas.map(c => {
+        let fechaStr = "01/01/2026";
+        if (c.fecha) {
+          if (c.fecha.includes('-')) {
+            fechaStr = c.fecha.split('-').reverse().join('/');
+          } else {
+            fechaStr = String(c.fecha);
+          }
+        }
+        return {
+          fecha: fechaStr,
+          descripcion: `CITA: ${c.cliente} - ${c.servicio} (${c.hora})`,
+          estado: 'Pendiente', prioridad: 'CITA', tipo: 'Cita', id: c.id
+        };
+      });
+
+      const listaCompleta = netas
+        .concat(cumples)
+        .concat(cumplesStaff)
+        .concat(citasAdaptadas)
+        .filter(ev => ev && ev.fecha);
+
+      const parseFechaParaSort = (fStr) => {
+        if (!fStr) return new Date(0);
+        const str = String(fStr).trim();
+        if (str.includes('/')) {
+          const p = str.split('/');
+          return new Date(`${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`);
+        }
+        if (str.includes('-')) {
+          return new Date(str);
+        }
+        return new Date(str);
+      };
+
+      listaCompleta.sort((a, b) => parseFechaParaSort(a.fecha) - parseFechaParaSort(b.fecha));
+
+      // Guardar en variables globales de paginación
+      window.AGENDA_ITEMS_ALL = listaCompleta;
+      window.AGENDA_ITEMS_FILTERED = [...listaCompleta];
+      window.AGENDA_CURRENT_PAGE = 1;
+
+      // Renderizar primera página
+      window.renderizarPaginaAgenda();
+
+    } catch(err) {
+      console.error("Error al cargar los datos de agenda:", err);
+      tbody.innerHTML = '<div class="text-center py-5 text-danger"><i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i> Error al cargar datos.</div>';
+    }
+  }).obtenerDatosAgendaCompletos();
+}
+
+window.renderizarPaginaAgenda = function() {
+  const tbody = document.getElementById('bodyTablaAgenda');
+  const template = document.getElementById('plantillaFilaAgenda');
+  if (!tbody || !template) return;
+
+  tbody.innerHTML = "";
+
+  const total = window.AGENDA_ITEMS_FILTERED.length;
+  if (total === 0) {
+    tbody.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-info-circle fs-3 d-block mb-2"></i> No se encontraron registros.</div>';
+    document.getElementById('infoPaginacionAgenda').textContent = "Mostrando 0 a 0 de 0 registros";
+    document.getElementById('ulPaginacionAgenda').innerHTML = "";
+    return;
+  }
+
+  const length = parseInt(document.getElementById('selectPageLengthAgenda').value) || 10;
+  const totalPages = Math.ceil(total / length);
+
+  if (window.AGENDA_CURRENT_PAGE > totalPages) {
+    window.AGENDA_CURRENT_PAGE = totalPages;
+  }
+  if (window.AGENDA_CURRENT_PAGE < 1) {
+    window.AGENDA_CURRENT_PAGE = 1;
+  }
+
+  const start = (window.AGENDA_CURRENT_PAGE - 1) * length;
+  const end = Math.min(start + length, total);
+
+  const slice = window.AGENDA_ITEMS_FILTERED.slice(start, end);
+
+  slice.forEach(ev => {
+    const clon = template.content.cloneNode(true);
+    const card = clon.querySelector('.agenda-item-card');
+    const badge = clon.querySelector('.celda-prioridad');
+    const celdaEstado = clon.querySelector('.celda-estado');
+
+    clon.querySelector('.celda-fecha').textContent = ev.fecha;
+    clon.querySelector('.celda-descripcion').textContent = ev.descripcion;
+
+    let borderLeftColor = '#3498db'; // Default azul
+
+    if (ev.tipo === 'Cumpleaños') {
+      const esStaff = ev.id && ev.id.includes("AGENTE");
+      badge.textContent = esStaff ? '🎂 CUMPLE STAFF' : '🎂 CUMPLE CLIENTE';
+      badge.className = `celda-prioridad badge ${esStaff ? 'bg-secondary bg-gradient text-white' : 'bg-warning bg-gradient text-dark'}`;
+      borderLeftColor = esStaff ? '#9b59b6' : '#f1c40f'; // Morado o Amarillo
+    } else if (ev.tipo === 'Cita') {
+      badge.className = 'celda-prioridad badge bg-success bg-gradient text-white';
+      badge.textContent = '📅 CITA';
+      borderLeftColor = '#2ecc71'; // Verde
+    } else if (ev.tipo === 'Ausencia') {
+      badge.className = 'celda-prioridad badge bg-danger bg-gradient text-white text-uppercase';
+      badge.textContent = '✈️ Ausencia';
+      borderLeftColor = '#e74c3c'; // Rojo
+    } else {
+      badge.textContent = `📝 PENDIENTE (${ev.prioridad})`;
+      if (ev.prioridad === 'Alta') {
+        badge.className = 'celda-prioridad badge bg-danger bg-gradient text-white';
+        borderLeftColor = '#e74c3c'; // Rojo
+      } else if (ev.prioridad === 'Media') {
+        badge.className = 'celda-prioridad badge bg-warning bg-gradient text-dark';
+        borderLeftColor = '#f39c12'; // Amarillo
+      } else {
+        badge.className = 'celda-prioridad badge bg-info bg-gradient text-white';
+        borderLeftColor = '#3498db'; // Azul
+      }
+    }
+
+    if (card) {
+      card.style.borderLeftColor = borderLeftColor;
+    }
+
+    if (celdaEstado) {
+      celdaEstado.textContent = ev.estado;
+      if (ev.estado === 'Completado' || ev.estado === 'Resuelta' || ev.estado === 'Realizada' || ev.estado === 'Migrado') {
+        celdaEstado.className = 'celda-estado badge rounded-pill px-3 py-1 bg-success-subtle text-success border border-success-subtle';
+      } else if (ev.estado === 'Cancelada' || ev.estado === 'Cancelado' || ev.estado === 'No asistió') {
+        celdaEstado.className = 'celda-estado badge rounded-pill px-3 py-1 bg-danger-subtle text-danger border border-danger-subtle';
+      } else {
+        celdaEstado.className = 'celda-estado badge rounded-pill px-3 py-1 bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+      }
+    }
+
+    // Botones de acción
+    const contenedorBtn = clon.querySelector('.contenedor-accion');
+    if (ev.tipo !== 'Cumpleaños') { // No se borran/editan cumples desde aquí
+       agregarBotonesAccion(contenedorBtn, ev);
+    }
+
+    tbody.appendChild(clon);
+  });
+
+  // Actualizar Info Footer
+  document.getElementById('infoPaginacionAgenda').textContent = `Mostrando ${start + 1} a ${end} de ${total} registros`;
+
+  // Renderizar Botones Paginación
+  renderizarBotonesPaginacionAgenda(totalPages);
+};
+
+function renderizarBotonesPaginacionAgenda(totalPages) {
+  const ul = document.getElementById('ulPaginacionAgenda');
+  if (!ul) return;
+  ul.innerHTML = "";
+
+  // Botón Anterior
+  const liPrev = document.createElement('li');
+  liPrev.className = `page-item ${window.AGENDA_CURRENT_PAGE === 1 ? 'disabled' : ''}`;
+  liPrev.innerHTML = `<a class="page-link border-0 rounded-3 text-dark fw-semibold" href="javascript:void(0)" onclick="window.cambiarPaginaAgenda(${window.AGENDA_CURRENT_PAGE - 1})">Anterior</a>`;
+  ul.appendChild(liPrev);
+
+  // Determinar rango de páginas a mostrar (para no desbordar si hay 50 páginas)
+  let startPage = Math.max(1, window.AGENDA_CURRENT_PAGE - 2);
+  let endPage = Math.min(totalPages, startPage + 4);
+  if (endPage - startPage < 4) {
+    startPage = Math.max(1, endPage - 4);
+  }
+
+  // Páginas
+  for (let i = startPage; i <= endPage; i++) {
+    const li = document.createElement('li');
+    li.className = `page-item ${window.AGENDA_CURRENT_PAGE === i ? 'active' : ''}`;
+    li.innerHTML = `<a class="page-link border-0 rounded-3 fw-bold px-3 ${window.AGENDA_CURRENT_PAGE === i ? '' : 'text-dark'}" href="javascript:void(0)" onclick="window.cambiarPaginaAgenda(${i})">${i}</a>`;
+    ul.appendChild(li);
+  }
+
+  // Botón Siguiente
+  const liNext = document.createElement('li');
+  liNext.className = `page-item ${window.AGENDA_CURRENT_PAGE === totalPages ? 'disabled' : ''}`;
+  liNext.innerHTML = `<a class="page-link border-0 rounded-3 text-dark fw-semibold" href="javascript:void(0)" onclick="window.cambiarPaginaAgenda(${window.AGENDA_CURRENT_PAGE + 1})">Siguiente</a>`;
+  ul.appendChild(liNext);
+}
+
+window.cambiarPaginaAgenda = function(page) {
+  window.AGENDA_CURRENT_PAGE = page;
+  window.renderizarPaginaAgenda();
+};
+
+window.onChangeLengthAgenda = function() {
+  window.AGENDA_CURRENT_PAGE = 1;
+  window.renderizarPaginaAgenda();
+};
+
+window.onSearchAgenda = function() {
+  const input = document.getElementById('inputBuscarAgendaCard');
+  if (!input) return;
+  const filtro = input.value.toLowerCase().trim();
+
+  if (!filtro) {
+    window.AGENDA_ITEMS_FILTERED = [...window.AGENDA_ITEMS_ALL];
+  } else {
+    window.AGENDA_ITEMS_FILTERED = window.AGENDA_ITEMS_ALL.filter(ev => {
+      const textToSearch = `${ev.fecha || ''} ${ev.descripcion || ''} ${ev.prioridad || ''} ${ev.estado || ''}`.toLowerCase();
+      return textToSearch.includes(filtro);
+    });
+  }
+
+  window.AGENDA_CURRENT_PAGE = 1;
+  window.renderizarPaginaAgenda();
+};
+
+function agregarBotonesAccion(contenedor, ev) {
+  const btnOk = document.createElement('button');
+  btnOk.className = 'btn btn-sm btn-outline-success me-1';
+  btnOk.innerHTML = '<i class="bi bi-check-lg"></i>';
+  btnOk.title = 'Marcar como completado';
+  btnOk.onclick = () => window.marcarComoHecho(ev.id);
+
+  const btnEdit = document.createElement('button');
+  btnEdit.className = 'btn btn-sm btn-outline-primary me-1';
+  btnEdit.innerHTML = '<i class="bi bi-pencil"></i>';
+  btnEdit.title = 'Editar evento';
+  btnEdit.onclick = () => window.abrirEditorEvento(ev);
+
+  const btnDel = document.createElement('button');
+  btnDel.className = 'btn btn-sm btn-outline-danger';
+  btnDel.innerHTML = '<i class="bi bi-trash3"></i>';
+  btnDel.title = 'Eliminar evento';
+  btnDel.onclick = () => window.confirmarEliminarEvento(ev.id, ev.tipo);
+
+  contenedor.appendChild(btnOk);
+  contenedor.appendChild(btnEdit);
+  contenedor.appendChild(btnDel);
+}
+
+// 4. UTILIDADES Y FILTRADO
+window.filtrarTablaAgenda = function() {
+  const input = document.getElementById("inputBuscarAgenda");
+  if (!input) return;
+  const filtro = input.value.toLowerCase();
+  const filas = document.querySelectorAll("#bodyTablaAgenda .agenda-item-card");
+
+  filas.forEach(fila => {
+    const texto = fila.textContent.toLowerCase();
+    fila.style.setProperty('display', texto.includes(filtro) ? 'flex' : 'none', 'important');
+  });
+};
+
+window.cambiarVistaAgenda = function(vista) {
+  const cal = document.getElementById('contenedorCalendario');
+  const tab = document.getElementById('contenedorTablaAgenda');
+  const bus = document.getElementById('busquedaAgendaContainer');
+  const btnCal = document.getElementById('btnVistaCalendario');
+  const btnTab = document.getElementById('btnVistaTabla');
+
+  if (vista === 'calendario') {
+    cal.classList.remove('d-none');
+    tab.classList.add('d-none');
+    // Aseguramos que se oculte el buscador en calendario
+    if(bus) bus.classList.add('d-none'); 
+    
+    btnCal.classList.add('active');
+    btnTab.classList.remove('active');
+    if (calendar) setTimeout(() => calendar.updateSize(), 200);
+  } else {
+    cal.classList.add('d-none');
+    tab.classList.remove('d-none');
+    // Aseguramos que se muestre el buscador SOLO en tabla
+    if(bus) bus.classList.remove('d-none'); 
+    
+    btnTab.classList.add('active');
+    btnCal.classList.remove('active');
+    cargarDatosDesdeGoogleSheets();
+  }
+};
+
+window.toggleFormEvento = function() {
+  const form = document.getElementById('seccionNuevoEvento');
+  if (form) form.classList.toggle('d-none');
+};
+
+window.marcarComoHecho = function(id) {
+  google.script.run.withSuccessHandler(function() {
+    Swal.fire('Actualizado', 'Tarea completada', 'success');
+    ejecutarCargaAgenda();
+  }).actualizarEstadoEvento(id, "Completado");
+};
+
+function transformarFechaParaCalendario(fechaStr) {
+  if (!fechaStr) return null;
+  const f = fechaStr.toString().trim();
+  
+  // Si ya es ISO (2026-01-10)
+  if (f.includes('-') && f.split('-')[0].length === 4) return f;
+  
+  // Si es DD/MM/YYYY (10/01/2026)
+  const p = f.split('/');
+  if (p.length === 3) {
+    return `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+  }
+  
+  // Si viene en formato ISO completo con 'T' (ej: 2026-01-10T00:00:00.000Z)
+  if (f.includes('T')) {
+    return f.split('T')[0];
+  }
+  
+  console.warn("JS: Formato de fecha no reconocido:", fechaStr);
+  return null;
+}
+
+function guardarNuevaNota() {
+  const idExistente = document.getElementById('regId').value;
+  const objeto = {
+    id: idExistente,
+    tipo: document.getElementById('regTipo').value,
+    prioridad: document.getElementById('regPrioridad').value,
+    descripcion: document.getElementById('regDesc').value
+  };
+
+  if (!objeto.descripcion) return Swal.fire("Aviso", "Agrega una descripción", "warning");
+
+  // Si hay ID, llamamos a actualizar, si no, a guardar nuevo
+  const funcionServer = idExistente ? "actualizarNotaAgenda" : "guardarNotaAgenda";
+  
+  google.script.run.withSuccessHandler(() => {
+    Swal.fire("Éxito", "Registro procesado", "success");
+    resetearFormulario();
+    ejecutarCargaAgenda(); // Esto refresca tabla y calendario
+  })[funcionServer](objeto);
+}
+
+function mostrarDetalleCitas(citas, fechaIso) {
+  // Convertimos yyyy-mm-dd a dd/mm/yyyy para el título
+  const fechaTitulo = fechaIso.split('-').reverse().join('/');
+  
+  let tablaHtml = `
+    <div class="table-responsive">
+      <table class="table table-sm table-striped mt-2" style="font-size: 13px;">
+        <thead>
+          <tr class="table-dark">
+            <th>Hora</th>
+            <th>Agente</th> <th>Cliente</th>
+            <th>Servicio</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  citas.forEach(c => {
+    tablaHtml += `
+      <tr>
+        <td><strong>${c.hora}</strong></td>
+        <td>${c.agente || 'No asignado'}</td> <td>${c.cliente}</td>
+        <td><span class="badge bg-light text-dark border">${c.servicio}</span></td>
+      </tr>
+    `;
+  });
+
+  tablaHtml += `</tbody></table></div>`;
+
+  Swal.fire({
+    title: `Citas del día ${fechaTitulo}`,
+    html: tablaHtml,
+    width: '500px',
+    confirmButtonText: 'Entendido',
+    confirmButtonColor: '#28a745'
+  });
+}
+
+// Función para cargar datos en el formulario
+window.abrirEditorEvento = function(ev) {
+  // Show the form if hidden
+  const form = document.getElementById('seccionNuevoEvento');
+  form.classList.remove('d-none');
+  
+  // Populate fields
+  document.getElementById('regId').value = ev.id || "";
+  document.getElementById('regTipo').value = ev.tipo || "Tarea";
+  document.getElementById('regPrioridad').value = ev.prioridad || "Media";
+  
+  // Clean CITA: prefix if exists
+  let desc = ev.descripcion || "";
+  document.getElementById('regDesc').value = desc.replace("CITA: ", "");
+  
+  // Feedback
+  const btn = document.querySelector("#seccionNuevoEvento .btn-success");
+  btn.innerHTML = '<i class="bi bi-pencil-square me-1"></i> Actualizar';
+};
+
+function resetearFormulario() {
+  document.getElementById('regId').value = "";
+  document.getElementById('regDesc').value = "";
+  const btn = document.querySelector("#seccionNuevoEvento .btn-success");
+  btn.innerHTML = '<i class="bi bi-save me-1"></i> Guardar';
+}
+
+window.confirmarEliminarEvento = function(id, tipo) {
+  Swal.fire({
+    title: "¿Eliminar registro?",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    confirmButtonText: 'Sí, eliminar'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      google.script.run.withSuccessHandler(() => {
+        Swal.fire('Eliminado', 'El registro ha sido borrado', 'success');
+        ejecutarCargaAgenda();
+      }).eliminarRegistroAgenda(id, tipo);
+    }
+  });
+};
+
+// --- LOGICA DINAMICA DE AUSENCIAS ---
+window.toggleTipoFormularioAgenda = function() {
+  const tipo = document.getElementById('regTipo').value;
+  const contPrio = document.getElementById('contenedorPrioridad');
+  const contDesc = document.getElementById('contenedorDescripcion');
+  const contAusencia = document.getElementById('contenedorAusenciaStaff');
+  
+  if (tipo === 'Ausencia') {
+    if (contPrio) contPrio.classList.add('d-none');
+    if (contDesc) contDesc.classList.add('d-none');
+    if (contAusencia) contAusencia.classList.remove('d-none');
+    
+    poblarSelectorAgentesAusencia();
+  } else {
+    if (contPrio) contPrio.classList.remove('d-none');
+    if (contDesc) contDesc.classList.remove('d-none');
+    if (contAusencia) contAusencia.classList.add('d-none');
+  }
+};
+
+function poblarSelectorAgentesAusencia() {
+  const select = document.getElementById('regAgenteAbsence');
+  if (!select) return;
+  select.innerHTML = '<option value="">Cargando colaboradores...</option>';
+  
+  google.script.run.withSuccessHandler(function(resRaw) {
+    try {
+      const agentes = JSON.parse(resRaw);
+      select.innerHTML = '<option value="">-- Seleccionar Colaborador --</option>';
+      agentes.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = a.apodo || a.nombre_completo;
+        select.appendChild(opt);
+      });
+    } catch(err) {
+      console.error("Error al parsear agentes activos:", err);
+      select.innerHTML = '<option value="">Error al cargar agentes</option>';
+    }
+  }).obtenerAgentesActivosBasico();
+}
+
+window.guardarAusenciaStaff = function() {
+  const agenteId = document.getElementById('regAgenteAbsence').value;
+  const motivo = document.getElementById('regMotivoAbsence').value;
+  const fechaFin = document.getElementById('regFechaFinAbsence').value;
+  
+  if (!agenteId) return Swal.fire("Aviso", "Por favor seleccione un colaborador", "warning");
+  if (!fechaFin) return Swal.fire("Aviso", "Por favor seleccione la fecha de retorno / fin", "warning");
+  
+  const hoyStr = new Date().toISOString().split('T')[0];
+  
+  const objeto = {
+    agenteId: agenteId,
+    motivo: motivo,
+    fechaInicio: hoyStr,
+    fechaFin: fechaFin,
+    comentario: ""
+  };
+  
+  if (window.mostrarCargando) window.mostrarCargando();
+  
+  google.script.run.withSuccessHandler(function(res) {
+    if (window.ocultarCargando) window.ocultarCargando();
+    Swal.fire("Éxito", "Ausencia de personal registrada correctamente", "success");
+    
+    // Reset fields
+    document.getElementById('regAgenteAbsence').value = "";
+    document.getElementById('regFechaFinAbsence').value = "";
+    
+    const form = document.getElementById('seccionNuevoEvento');
+    if (form) form.classList.add('d-none');
+    
+    document.getElementById('regTipo').value = "Tarea";
+    window.toggleTipoFormularioAgenda();
+    
+    ejecutarCargaAgenda();
+  }).guardarAusenciaAgente(objeto);
+};
+</script>
+
+<script>
+/**
+ * --- GESTIÓN DE MODAL DE CITAS ---
+ * Maneja la lógica de reserva de citas, generación de horarios y envío al servidor.
+ */
+(function() {
+
+    let citaModal; 
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const modalElement = document.getElementById('modalCita');
+        if (modalElement) {
+            citaModal = new bootstrap.Modal(modalElement);
+        }
+        cargarSelectHorarios();
+    });
+
+    /**
+     * Genera horarios en intervalos de 15 min.
+     */
+    function generarOpcionesHora(inicioHora, finHora) {
+      const opciones = [];
+      for (let h = inicioHora; h <= finHora; h++) {
+        for (let m = 0; m < 60; m += 15) {
+          if (h === finHora && m > 0) break;
+          opciones.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+        }
+      }
+      return opciones;
+    }
+
+    /**
+     * Carga el SELECT con formato 12h pero valor 24h.
+     */
+    function cargarSelectHorarios() {
+      const select = document.getElementById('horaInputCitaModal');
+      if (!select) return;
+
+      const horarios = generarOpcionesHora(7, 21); 
+      select.innerHTML = '<option value="" disabled selected>Seleccione una hora</option>';
+
+      const fragment = document.createDocumentFragment();
+      horarios.forEach(hora24h => {
+        const [h, m] = hora24h.split(':');
+        const hNum = parseInt(h, 10);
+        const meridiano = hNum >= 12 ? 'PM' : 'AM';
+        const hora12h = hNum % 12 || 12;
+
+        const option = document.createElement('option');
+        option.value = hora24h;
+        option.textContent = `${hora12h}:${m} ${meridiano}`;
+        fragment.appendChild(option);
+      });
+      select.appendChild(fragment);
+    }
+
+    function abrirModalCita() {
+      const inputFecha = document.getElementById('fechaInputCitaModal');
+      if (inputFecha && !inputFecha.value) {
+        inputFecha.value = new Date().toISOString().split('T')[0];
+      }
+      if (citaModal) citaModal.show();
+    }
+
+    function cerrarModalCita() {
+      if (citaModal) citaModal.hide();
+      // Limpieza masiva de campos
+      ['fechaInputCitaModal', 'horaInputCitaModal', 'clientesDatalistCitaModal', 
+        'agentesDisponiblesDatalistCitaModal', 'tipoOATCDatalistCitaModal'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+      });
+    }
+    
+    /**
+     * Manejador de éxito tras registrar cita
+     */
+    function onSuccessRegistroCita(respuesta) {
+      if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+      
+      cerrarModalCita();
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Cita Agendada',
+        text: respuesta || 'La cita se registró correctamente.',
+        timer: 2500,
+        showConfirmButton: false,
+        timerProgressBar: true
+      });
+
+      if (window.actualizarVistasPostAccion) {
+        window.actualizarVistasPostAccion();
+      }
+    }
+    /**
+     * Elimina una cita tras confirmar con el usuario
+     */
+    function eliminarCita(numFila) {
+      Swal.fire({
+        title: '¿Eliminar cita?',
+        text: "Esta acción no se puede deshacer.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Sí, eliminar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          if (window.mostrarSpinner) window.mostrarSpinner();
+          google.script.run
+            .withSuccessHandler(() => {
+              if (window.ocultarSpinner) window.ocultarSpinner();
+              Swal.fire('Eliminado', 'La cita ha sido borrada.', 'success');
+              // Refrescamos el modal de listado haciendo clic en el botón de filtro
+              document.getElementById('btnFiltrarViewCitasHoy').click();
+            })
+            .eliminarFilaCitaServidor(numFila);
+        }
+      });
+    }
+
+    /**
+     * Carga los datos de una cita en el modal de registro para editarla
+     */
+    function editarCita(numFila) {
+      // 1. Cerramos el modal de listado
+      const modalListado = bootstrap.Modal.getInstance(document.getElementById('modalListadoCitas'));
+      if (modalListado) modalListado.hide();
+
+      if (window.mostrarSpinner) window.mostrarSpinner();
+
+      // 2. Buscamos los datos en el servidor
+      google.script.run
+        .withSuccessHandler(datos => {
+          if (window.ocultarSpinner) window.ocultarSpinner();
+          
+          // Abrimos el modal de registro
+          abrirModalCita();
+
+          // 3. Poblamos los campos
+          document.getElementById('fechaInputCitaModal').value = datos.fecha;
+          document.getElementById('horaInputCitaModal').value = datos.hora;
+          document.getElementById('clientesDatalistCitaModal').value = datos.cliente;
+          document.getElementById('agentesDisponiblesDatalistCitaModal').value = datos.agente;
+          document.getElementById('tipoOATCDatalistCitaModal').value = datos.servicio;
+          
+          document.getElementById('fechaInputCitaModal').dataset.filaEditar = numFila;
+          
+          const btnGuardar = document.querySelector('button[onclick="guardarCita()"]');
+          if(btnGuardar) btnGuardar.textContent = "Actualizar Cita";
+        })
+        .obtenerDatosCitaPorFila(numFila);
+    }
+    /**
+     * Recopila y envía el formulario de cita
+     */
+    function guardarCita() {
+      const filaAEditar = document.getElementById('fechaInputCitaModal').dataset.filaEditar;
+      const CitaForm = {
+        numFila: filaAEditar || null,
+        fechaCita: document.getElementById('fechaInputCitaModal')?.value,
+        horaCita: document.getElementById('horaInputCitaModal')?.value,
+        nombreClienteOATC: document.getElementById('clientesDatalistCitaModal')?.value,
+        nombreAgenteOATC: document.getElementById('agentesDisponiblesDatalistCitaModal')?.value,
+        tipoOATC: document.getElementById('tipoOATCDatalistCitaModal')?.value
+      };
+
+      if (!CitaForm.fechaCita || !CitaForm.horaCita || !CitaForm.nombreClienteOATC) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Datos Incompletos',
+          text: 'La fecha, hora y cliente son obligatorios para agendar.',
+          confirmButtonColor: '#f39c12'
+        });
+        return;
+      }
+
+      if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+      google.script.run
+        .withSuccessHandler(onSuccessRegistroCita)
+        .withFailureHandler(err => {
+          if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+          window.onFailureConexion(err);
+        })
+        .registrarCita(CitaForm);
+    }
+
+    // --- MEJORA DE UX DE CLIENTES ---
+    const initClienteCitaInputUX = () => {
+      const inputCliente = document.getElementById('clientesDatalistCitaModal');
+      if (inputCliente) {
+        inputCliente.addEventListener('input', function(e) {
+          const val = e.target.value;
+          if (val.includes(' | DNI:')) {
+            const parts = val.split(' | DNI:');
+            e.target.value = parts[0].trim();
+          }
+        });
+      }
+    };
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initClienteCitaInputUX);
+    } else {
+      initClienteCitaInputUX();
+    }
+
+    // --- EXPOSICIÓN GLOBAL ---
+    window.abrirModalCita = abrirModalCita;
+    window.cerrarModalCita = cerrarModalCita;
+    window.guardarCita = guardarCita;
+    window.editarCita = editarCita;
+    window.eliminarCita = eliminarCita;
+
+})();
+</script>

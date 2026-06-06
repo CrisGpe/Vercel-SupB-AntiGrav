@@ -1,0 +1,120 @@
+<script>
+/**
+ * --- GESTIÓN DE MODAL: ASIGNACIÓN DE AGENTE ---
+ * Permite asignar un profesional a una OATC específica y activarla.
+ */
+(function() {
+
+  let asignacionAgenteModal; 
+  window.currentOatcIdToAssign = ''; 
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const modalElement = document.getElementById('modalAsignacionAgente');
+    if (modalElement) {
+      asignacionAgenteModal = new bootstrap.Modal(modalElement);
+    }
+  });
+
+  /**
+   * Prepara y muestra el modal de asignación.
+   * @param {string} oatcId - El ID de la orden a la que se le asignará agente.
+   */
+  function abrirModalAsignacionAgente(oatcId) {
+    if (!oatcId) return;
+
+    window.currentOatcIdToAssign = oatcId; 
+    
+    // Inyección de ID en etiquetas y campos ocultos
+    const labelId = document.getElementById('modalAsignacionOATCId');
+    const inputHidden = document.getElementById('hiddenOatcIdModal');
+    const inputAgente = document.getElementById('agenteAsignadoDatalistModal');
+
+    if (labelId) labelId.textContent = oatcId;
+    if (inputHidden) inputHidden.value = oatcId;
+    if (inputAgente) inputAgente.value = '';
+
+    // Asegurar que la lista de agentes esté fresca antes de mostrar el modal
+    if (typeof window.loadInfoDataListAgentesActivos === 'function') {
+      window.loadInfoDataListAgentesActivos(); 
+    }
+
+    if (asignacionAgenteModal) asignacionAgenteModal.show();
+  }
+
+  function cerrarModalAsignacionAgente() {
+    if (asignacionAgenteModal) asignacionAgenteModal.hide();
+    
+    // Limpieza de mensajes de estado si aún existen en el HTML
+    const statusMsg = document.getElementById('statusMessageModalAsignacion');
+    if (statusMsg) statusMsg.textContent = '';
+  }
+
+  /**
+   * Envía la asignación al servidor.
+   */
+  function confirmarAsignacionAgente() {
+    const inputAgente = document.getElementById('agenteAsignadoDatalistModal');
+    const nuevoAgenteAsignado = inputAgente ? inputAgente.value.trim() : '';
+
+    // 1. Validación con SweetAlert2
+    if (!nuevoAgenteAsignado) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Asignación requerida',
+        text: 'Por favor, selecciona un agente de la lista para continuar.',
+        confirmButtonColor: '#3085d6'
+      });
+      return;
+    }
+
+    // 2. Activar Feedback Visual
+    if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+    // 3. Llamada al servidor
+    google.script.run
+      .withSuccessHandler(onSuccessAsignacion)
+      .withFailureHandler(function(error) {
+        if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+        if (typeof window.onFailureConexion === 'function') {
+          window.onFailureConexion(error);
+        }
+      })
+      .asignarAgenteYActivar(window.currentOatcIdToAssign, nuevoAgenteAsignado);
+  }
+
+  /**
+   * Manejador de éxito para la asignación.
+   */
+  function onSuccessAsignacion(respuesta) {
+    // El spinner se oculta dentro de actualizarVistasPostAccion o aquí manualmente
+    if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+    
+    cerrarModalAsignacionAgente();
+
+    // Notificación rápida de éxito (Toast)
+    Swal.fire({
+      icon: 'success',
+      title: 'Agente Asignado',
+      text: `La OATC ${window.currentOatcIdToAssign} ahora está activa.`,
+      timer: 2000,
+      showConfirmButton: false
+    });
+
+    if (typeof window.generarNuevoIdOATC === 'function') {
+      console.log("DEBUG: Forzando actualización de ID tras asignación exitosa.");
+      window.generarNuevoIdOATC(); 
+    }
+
+    // Actualización global de la UI
+    if (typeof window.actualizarVistasPostAccion === 'function') {
+      window.actualizarVistasPostAccion(respuesta);
+    }
+  }
+
+  // --- EXPOSICIÓN GLOBAL ---
+  window.abrirModalAsignacionAgente = abrirModalAsignacionAgente;
+  window.cerrarModalAsignacionAgente = cerrarModalAsignacionAgente;
+  window.confirmarAsignacionAgente = confirmarAsignacionAgente;
+
+})(); 
+</script>

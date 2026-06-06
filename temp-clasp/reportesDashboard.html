@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <?!= include('onTopCSS'); ?>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/2.1.3/css/dataTables.bootstrap5.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Chart.js for premium analytics visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <div id="loading-overlay">
+      <div class="spinner-custom"></div>
+      <div class="loading-text">PROCESANDO...</div>
+    </div>
+
+    <!-- 🌟 NAVBAR PREMIUM UNIFICADO -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow">
+      <div class="container-fluid">
+        <a class="navbar-brand fw-bold text-uppercase" href="#"><i class="fas fa-scissors me-2 text-warning"></i>Antigravity Salon</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="?p=recepcion"><i class="fas fa-concierge-bell me-1"></i> Recepción</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="?p=caja"><i class="fas fa-cash-register me-1"></i> Caja</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="?p=insumos"><i class="fas fa-boxes me-1"></i> Despacho Insumos</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link active" href="?p=reportes"><i class="fas fa-chart-line me-1"></i> Reportes</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 🌐 CONTROLES DE ACCESIBILIDAD Y TEMA EN PARTE INFERIOR DERECHA -->
+    <div class="bottom-right-controls shadow d-flex align-items-center gap-2 bg-white p-2 px-3 border rounded-pill" 
+         style="position: fixed; bottom: 20px; right: 20px; z-index: 2000; transition: all 0.3s;">
+      <div onclick="cambiarTamanoFuente()" title="Cambiar tamaño de letra" style="cursor: pointer; display: inline-flex; align-items: center; gap: 4px; border-right: 1px solid #ccc; padding-right: 10px;">
+        <span style="font-size: 10px;">A</span>
+        <span style="font-size: 14px; font-weight: bold;">A</span>
+        <span style="font-size: 18px;">A</span>
+      </div>
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" role="switch" id="themeSwitch" onclick="toggleTheme()" style="cursor: pointer;">
+        <label class="form-check-label ms-1" for="themeSwitch" style="cursor: pointer; font-size: 12px; font-weight: bold;"><i class="fas fa-moon"></i></label>
+      </div>
+    </div>
+
+    <div class="container-fluid px-4">
+      <div class="row align-items-center mb-4 mt-3">
+        <div class="col-md-4"></div>
+        <div class="col-md-4 text-center">
+          <div id="my-clock" class="clock"></div>
+          <div id="date" class="date"></div>
+        </div>
+        <div class="col-md-4"></div>
+      </div>
+
+      <!-- KPIN CARDS -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="modern-card p-3 text-center border-start border-4 border-info">
+            <h6 class="text-muted text-uppercase small">Citas Hoy</h6>
+            <h2 class="fw-bold text-info" id="repCitasHoy">0</h2>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="modern-card p-3 text-center border-start border-4 border-success">
+            <h6 class="text-muted text-uppercase small">Facturación Hoy</h6>
+            <h2 class="fw-bold text-success" id="repFacturacionHoy">S/ 0.00</h2>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="modern-card p-3 text-center border-start border-4 border-warning">
+            <h6 class="text-muted text-uppercase small">Órdenes Activas</h6>
+            <h2 class="fw-bold text-warning" id="repOrdenesActivas">0</h2>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="modern-card p-3 text-center border-start border-4 border-danger">
+            <h6 class="text-muted text-uppercase small">Insumos Críticos</h6>
+            <h2 class="fw-bold text-danger" id="repInsumosCriticos">0</h2>
+          </div>
+        </div>
+      </div>
+
+      <!-- ANALYTICS CHARTS -->
+      <div class="row g-4 mb-4">
+        <div class="col-md-8">
+          <div class="modern-card p-3">
+            <h5 class="fw-bold mb-3"><i class="fas fa-chart-bar text-primary me-2"></i>Facturación por Estilista</h5>
+            <div style="height: 350px; position: relative;">
+              <canvas id="chartFacturacionEstilistas"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="modern-card p-3">
+            <h5 class="fw-bold mb-3"><i class="fas fa-chart-pie text-success me-2"></i>Distribución de Servicios</h5>
+            <div style="height: 350px; position: relative;">
+              <canvas id="chartTiposServicio"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <?!= include('relojJS.html'); ?>
+    <?!= include('gestionAccesibilidadJS'); ?>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        cargarReportes();
+      });
+
+      function cargarReportes() {
+        if (window.mostrarSpinner) window.mostrarSpinner("Cargando Reportes...");
+        google.script.run
+          .withSuccessHandler(function(data) {
+            if (window.ocultarSpinner) window.ocultarSpinner();
+            
+            // Llenar KPIs
+            document.getElementById('repCitasHoy').innerText = data.citasHoy || 0;
+            document.getElementById('repFacturacionHoy').innerText = 'S/ ' + (data.facturacionHoy || 0).toFixed(2);
+            document.getElementById('repOrdenesActivas').innerText = data.ordenesActivas || 0;
+            document.getElementById('repInsumosCriticos').innerText = data.insumosCriticos || 0;
+
+            // Renderizar Gráfico de Barra
+            const ctxBar = document.getElementById('chartFacturacionEstilistas').getContext('2d');
+            new Chart(ctxBar, {
+              type: 'bar',
+              data: {
+                labels: data.estilistasNombres || [],
+                datasets: [{
+                  label: 'Monto Total Facturado (S/)',
+                  data: data.estilistasFacturacion || [],
+                  backgroundColor: 'rgba(111, 66, 193, 0.7)',
+                  borderColor: 'rgba(111, 66, 193, 1)',
+                  borderWidth: 1
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                  y: { beginAtZero: true }
+                }
+              }
+            });
+
+            // Renderizar Gráfico de Torta
+            const ctxPie = document.getElementById('chartTiposServicio').getContext('2d');
+            new Chart(ctxPie, {
+              type: 'pie',
+              data: {
+                labels: data.serviciosCategorias || [],
+                datasets: [{
+                  data: data.serviciosCantidades || [],
+                  backgroundColor: [
+                    '#ff6384', '#36a2eb', '#cc65fe', '#ffce56', '#4bc0c0', '#afdf22'
+                  ]
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false
+              }
+            });
+          })
+          .withFailureHandler(function(err) {
+            if (window.ocultarSpinner) window.ocultarSpinner();
+            Swal.fire("Error", "No se pudieron obtener datos de reportes: " + err.message, "error");
+          })
+          .obtenerDatosResumenReportes();
+      }
+    </script>
+  </body>
+</html>

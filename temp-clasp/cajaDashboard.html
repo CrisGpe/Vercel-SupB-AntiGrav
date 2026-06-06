@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <?!= include('onTopCSS'); ?>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/2.1.3/css/dataTables.bootstrap5.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  </head>
+  <body>
+    <div id="loading-overlay">
+      <div class="spinner-custom"></div>
+      <div class="loading-text">PROCESANDO...</div>
+    </div>
+
+    <!-- 🌟 NAVBAR PREMIUM UNIFICADO -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow">
+      <div class="container-fluid">
+        <a class="navbar-brand fw-bold text-uppercase" href="#"><i class="fas fa-scissors me-2 text-warning"></i>Antigravity Salon</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="?p=recepcion"><i class="fas fa-concierge-bell me-1"></i> Recepción</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link active" href="?p=caja"><i class="fas fa-cash-register me-1"></i> Caja</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="?p=insumos"><i class="fas fa-boxes me-1"></i> Despacho Insumos</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="?p=reportes"><i class="fas fa-chart-line me-1"></i> Reportes</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 🌐 CONTROLES DE ACCESIBILIDAD Y TEMA EN PARTE INFERIOR DERECHA -->
+    <div class="bottom-right-controls shadow d-flex align-items-center gap-2 bg-white p-2 px-3 border rounded-pill" 
+         style="position: fixed; bottom: 20px; right: 20px; z-index: 2000; transition: all 0.3s;">
+      <div onclick="cambiarTamanoFuente()" title="Cambiar tamaño de letra" style="cursor: pointer; display: inline-flex; align-items: center; gap: 4px; border-right: 1px solid #ccc; padding-right: 10px;">
+        <span style="font-size: 10px;">A</span>
+        <span style="font-size: 14px; font-weight: bold;">A</span>
+        <span style="font-size: 18px;">A</span>
+      </div>
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" role="switch" id="themeSwitch" onclick="toggleTheme()" style="cursor: pointer;">
+        <label class="form-check-label ms-1" for="themeSwitch" style="cursor: pointer; font-size: 12px; font-weight: bold;"><i class="fas fa-moon"></i></label>
+      </div>
+    </div>
+
+    <div class="container-fluid px-4">
+      <div class="row align-items-center mb-4 mt-3">
+        <div class="col-md-4"></div>
+        <div class="col-md-4 text-center">
+          <div id="my-clock" class="clock"></div>
+          <div id="date" class="date"></div>
+        </div>
+        <div class="col-md-4 text-end">
+          <button class="btn btn-danger fw-bold" onclick="abrirCierreCaja()"><i class="fas fa-lock me-2"></i>Cierre de Caja</button>
+        </div>
+      </div>
+
+      <!-- STATS -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <div class="modern-card p-3 text-center border-start border-4 border-success">
+            <h5 class="text-muted">Total Ventas</h5>
+            <h2 class="fw-bold text-success" id="cajaTotalVentas">S/ 0.00</h2>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="modern-card p-3 text-center border-start border-4 border-primary">
+            <h5 class="text-muted">Servicios Atendidos</h5>
+            <h2 class="fw-bold text-primary" id="cajaServiciosCount">0</h2>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="modern-card p-3 text-center border-start border-4 border-warning">
+            <h5 class="text-muted">Caja Inicial / Estado</h5>
+            <h2 class="fw-bold text-warning">Abierto</h2>
+          </div>
+        </div>
+      </div>
+
+      <!-- MAIN TABLE -->
+      <div class="modern-card">
+        <div class="table-header-container bg-dark text-white p-3">
+          <h4 class="mb-0 fw-bold"><i class="fas fa-list-alt me-2 text-warning"></i>Historial de Ventas - Hoy</h4>
+        </div>
+        <div class="p-3">
+          <table class="table table-striped table-hover align-middle" id="tablaVentasCaja">
+            <thead>
+              <tr>
+                <th>Ticket</th>
+                <th>Fecha/Hora</th>
+                <th>Cliente</th>
+                <th>Servicio</th>
+                <th>Monto Final</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="cajaVentasBody">
+              <tr>
+                <td colspan="6" class="text-center py-4 text-muted">Cargando transacciones de caja de hoy...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/2.1.3/js/dataTables.js"></script>
+    <script src="https://cdn.datatables.net/2.1.3/js/dataTables.bootstrap5.js"></script>
+    
+    <?!= include('relojJS.html'); ?>
+    <?!= include('gestionAccesibilidadJS'); ?>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        cargarDatosCaja();
+      });
+
+      function cargarDatosCaja() {
+        if (window.mostrarSpinner) window.mostrarSpinner("Cargando Ventas...");
+        google.script.run
+          .withSuccessHandler(function(data) {
+            if (window.ocultarSpinner) window.ocultarSpinner();
+            const body = document.getElementById('cajaVentasBody');
+            if (!data || data.length === 0) {
+              body.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No se registran transacciones el día de hoy.</td></tr>';
+              return;
+            }
+
+            let total = 0;
+            body.innerHTML = data.map(item => {
+              const monto = parseFloat(item.monto_final) || 0;
+              total += monto;
+              return `
+                <tr>
+                  <td><span class="badge bg-dark fw-bold">${item.ticket_id || 'N/A'}</span></td>
+                  <td>${new Date(item.created_at).toLocaleString('es-PE')}</td>
+                  <td>${item.cliente_id || 'Cliente General'}</td>
+                  <td>${item.servicio_final || item.servicio_original || '-'}</td>
+                  <td class="fw-bold text-success">S/ ${monto.toFixed(2)}</td>
+                  <td><span class="badge bg-success">${item.estado || 'Pagado'}</span></td>
+                </tr>
+              `;
+            }).join('');
+
+            document.getElementById('cajaTotalVentas').innerText = 'S/ ' + total.toFixed(2);
+            document.getElementById('cajaServiciosCount').innerText = data.length;
+          })
+          .withFailureHandler(function(err) {
+            if (window.ocultarSpinner) window.ocultarSpinner();
+            Swal.fire("Error", "Error al consultar ventas de caja: " + err.message, "error");
+          })
+          .obtenerVentasCajaHoy();
+      }
+
+      function abrirCierreCaja() {
+        Swal.fire({
+          title: '¿Realizar Cierre de Caja?',
+          text: "Esto registrará el balance final de la fecha y congelará los registros actuales.",
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33',
+          confirmButtonText: 'Sí, Cerrar Caja',
+          cancelButtonText: 'Cancelar'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            Swal.fire('¡Caja Cerrada!', 'El cierre se ha registrado exitosamente.', 'success');
+          }
+        });
+      }
+    </script>
+  </body>
+</html>

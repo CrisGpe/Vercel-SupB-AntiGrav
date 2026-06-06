@@ -1,0 +1,890 @@
+<!-- MÓDULO PRINCIPAL DE CONTROL, RELOJ Y ACCESIBILIDAD -->
+
+<!-- ========================================== -->
+<!-- DE: relojJS.html                           -->
+<!-- ========================================== -->
+<script>
+  function showDate() {
+    let date = new Date();
+    let d = date.getDate();
+    let m = date.getMonth() + 1; // Months are 0-indexed
+    let y = String(date.getFullYear()).slice(-2); // Get last 2 digits of the year
+    let currentDate = document.querySelector("#date");
+    if (currentDate) currentDate.innerHTML = `${d}/${m}/${y}`;
+  }
+
+  function showTime() {
+    let date = new Date();
+    let h = date.getHours();
+    let m = date.getMinutes();
+    let s = date.getSeconds();
+    let amPm = h >= 12 ? "pm" : "am";
+
+    h = h % 12;
+    h = h ? h : 12; // 12-hour clock
+    h = h < 10 ? `0${h}` : h;
+    m = m < 10 ? `0${m}` : m;
+    s = s < 10 ? `0${s}` : s;
+
+    let clock = document.querySelector("#my-clock");
+    if (clock) clock.innerHTML = `${h}:${m}:${s} ${amPm}`;
+
+    setTimeout(showTime, 1000);
+  }
+
+  showTime();
+  showDate();
+</script>
+
+<!-- ========================================== -->
+<!-- DE: gestionAccesibilidadJS.html            -->
+<!-- ========================================== -->
+<script>
+  /**
+   * --- GESTIÓN DE ACCESIBILIDAD Y PERSISTENCIA ---
+   */
+  let nivelFuente = 0; 
+  const tamanos = ['14px', '17px', '20px'];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const tamañoGuardado = localStorage.getItem('appFontSize');
+    if (tamañoGuardado) {
+      document.documentElement.style.setProperty('--base-font-size', tamañoGuardado);
+      nivelFuente = tamanos.indexOf(tamañoGuardado);
+      if (nivelFuente === -1) nivelFuente = 0;
+    }
+
+    // Cargar Tema
+    const savedTheme = localStorage.getItem('appTheme');
+    if (savedTheme === 'dark') {
+      document.body.classList.add('dark-theme');
+      const sw = document.getElementById('themeSwitch');
+      if (sw) sw.checked = true;
+    }
+  });
+
+  function toggleTheme() {
+    const isDark = document.body.classList.toggle('dark-theme');
+    localStorage.setItem('appTheme', isDark ? 'dark' : 'light');
+    const sw = document.getElementById('themeSwitch');
+    if (sw) sw.checked = isDark;
+  }
+
+  function cambiarTamanoFuente() {
+    nivelFuente = (nivelFuente + 1) % tamanos.length;
+    const nuevoTamano = tamanos[nivelFuente];
+    document.documentElement.style.setProperty('--base-font-size', nuevoTamano);
+    localStorage.setItem('appFontSize', nuevoTamano);
+    
+    // Lo hacemos asíncrono para no bloquear la animación del cambio
+    setTimeout(reajustarTablasLayout, 50);
+  }
+
+  function reajustarTablasLayout() {
+    const tablasIds = ['#ordenesATCTabla', '#disponibilidadTurnosTabla', '#tablaCitas'];
+    tablasIds.forEach(id => {
+      // Solo ajustamos si el elemento está visible para ahorrar recursos
+      const el = document.querySelector(id);
+      if (el && el.offsetWidth > 0 && typeof $ !== 'undefined' && $.fn.DataTable && $.fn.DataTable.isDataTable(id)) {
+        $(id).DataTable().columns.adjust();
+      }
+    });
+  }
+
+  /**
+   * --- GESTIÓN DEL SPINNER (OPTIMIZADA) ---
+   */
+  window.mostrarSpinner = function(texto = "CARGANDO...") {
+    const overlay = document.getElementById('loading-overlay');
+    const txtEl = document.querySelector('.loading-text');
+    if (txtEl) txtEl.innerText = texto.toUpperCase();
+    if (overlay) {
+      overlay.style.display = 'flex';
+      overlay.style.pointerEvents = 'all'; // Bloqueo total de seguridad
+    }
+  };
+
+  window.ocultarSpinner = function() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+      // Forzamos al navegador a priorizar el ocultamiento visual
+      requestAnimationFrame(() => {
+        overlay.style.display = 'none';
+        overlay.style.pointerEvents = 'none';
+      });
+    }
+  };
+
+  // Alias
+  window.mostrarCarga = window.mostrarSpinner;
+  window.ocultarCarga = window.ocultarSpinner;
+</script>
+
+<!-- ========================================== -->
+<!-- DE: onLoadJS.html                          -->
+<!-- ========================================== -->
+<script>
+/**
+ * ==========================================================================
+ * MÓDULO PRINCIPAL DE CONTROL (onLoadJS) - VERSIÓN UNIFICADA Y SEGURA
+ * ==========================================================================
+ * Este archivo centraliza la orquestación de la UI, el sondeo de datos
+ * y la comunicación con Google Apps Script.
+ */
+
+// Estado global para el filtrado de Órdenes de Atención (OATC)
+window.filtroOATCActivo = 'Pendientes'; 
+
+(function() {
+    // --- CONFIGURACIÓN DE CONSTANTES ---
+    const AGENDA_PREVIEW_URL = "https://docs.google.com/document/d/1sOB4RpJ28zSda-vqo1VSXCw_ixMbVNm9qst6qZUUAac/preview";
+    const INTERVALO_SONDEO = 60000; // 60 segundos para actualización silenciosa
+
+    document.addEventListener("DOMContentLoaded", () => {
+      console.log("DEBUG(Cliente): DOM Cargado. Iniciando verificación de sesión...");
+      
+      const token = localStorage.getItem("user_token");
+      const rol = localStorage.getItem("user_role");
+      
+      if (token && rol) {
+        console.log("DEBUG: Sesión activa encontrada. Rol:", rol);
+        desbloquearIUConSesion(rol);
+      } else {
+        console.log("DEBUG: No hay sesión activa. Redirigiendo a pantalla de bloqueo.");
+        cerrarSistema();
+      }
+
+      /**
+       * --- B. REGISTRO DE EVENTOS PARA BOTONES ESTÁTICOS ---
+       * Se utiliza un mapeo para facilitar el mantenimiento.
+       */
+      const btnMap = {
+        // Gestión de Estados de Agentes
+        "btnActivarFicha": activarFicha,
+        "btnDesactivarFicha": desctivarFicha,
+        "btnRefrigerioFicha": refrigerioFicha,
+        "btnPsicologo": psicologoFicha,
+        "btnPasVoz": pasarVozFicha,
+        "btnSalioSalon": salioSalonFicha,
+        "btnPasarSalon": pasarSalonFicha,
+        
+        // Filtros Visuales de Agentes (Activan Spinner)
+        "btnFiltrarView": () => { mostrarCargando(); window.filtrarView(); },
+        "btnFiltrarViewEstilismo": () => { mostrarCargando(); window.filtrarViewEstilismo(); },
+        "btnFiltrarViewCosmiatria": () => { mostrarCargando(); window.filtrarViewCosmiatria(); },
+        "btnFiltrarViewOtros": () => { mostrarCargando(); window.filtrarViewOtros(); },
+        
+        // Gestión de Órdenes (OATC)
+        "btnRegistrarOATC": activarRegistrarOATC,
+        "btnFiltrarViewCitasHoy": () => {
+            mostrarCargando();
+            google.script.run
+              .withSuccessHandler(citas => {
+                ocultarCargando();
+                const tbody = document.getElementById('bodyGestionCitas');
+                tbody.innerHTML = '';
+
+                if (citas.length === 0) {
+                  tbody.innerHTML = '<tr><td colspan="5" class="text-center">No hay citas próximas.</td></tr>';
+                } else {
+                    tbody.innerHTML = ''; // Limpiar antes de llenar
+                    citas.forEach((cita) => {
+                        tbody.innerHTML += `
+                        <tr>
+                          <td>
+                               <div class="small fw-bold">${cita[5]}</div>
+                               <div class="small text-muted">${cita[1]}</div>
+                          </td>
+                          
+                          <td>${cita[2]}</td>
+                          
+                          <td><span class="badge bg-info text-dark">${cita[3]}</span></td>
+                          
+                          <td>${cita[4]}</td>
+                          
+                          <td class="text-center">
+                              <button class="btn btn-sm btn-outline-primary" onclick="window.editarCita(${cita[0]})">
+                                  <i class="fas fa-edit"></i>
+                              </button>
+                              <button class="btn btn-sm btn-outline-danger" onclick="window.eliminarCita(${cita[0]})">
+                                  <i class="fas fa-trash"></i>
+                              </button>
+                          </td>
+                        </tr>`;
+                  });
+                }
+                const modal = new bootstrap.Modal(document.getElementById('modalListadoCitas'));
+                modal.show();
+              })
+              .obtenerCitasRegistradasEnAdelante();
+          },
+        "btnFiltrarViewPendientes": () => { mostrarCargando(); window.filtrarViewOATCPendientes(); },
+        "btnFiltrarViewTodas": () => { mostrarCargando(); window.filtrarViewTodas(); },
+        
+        // Registro y Utilidades
+        "btnRegistrarCita": abrirModalCita,
+        "btnRegistrarCliente": abrirModalCliente,
+        "btnCerrar": cerrarSistema,
+        "btnAgendaHoy": () => mostrarAgendaDelMesEnModal()
+      };
+
+      // Inyección masiva de listeners con validación de existencia
+      Object.keys(btnMap).forEach(id => {
+        const elemento = document.getElementById(id);
+        if (elemento) {
+          elemento.addEventListener("click", btnMap[id]);
+        }
+      });
+
+      // Manejo de cierre de modales nativos al hacer clic fuera
+      window.onclick = function(event) {
+        const modalAgenda = document.getElementById('agendaModal');
+        if (modalAgenda && event.target == modalAgenda) {
+          const inst = bootstrap.Modal.getInstance(modalAgenda);
+          if (inst) inst.hide();
+        }
+      };
+        
+      /**
+       * --- C. DELEGACIÓN DE EVENTOS PARA ELEMENTOS DINÁMICOS ---
+       * Fundamental para botones generados por DataTables.
+       */
+      document.addEventListener('click', function(e) {
+        let target = e.target.closest('button, .eliminarOATC, .resolverOATC, .terminarATCBtn, .activarAsesoriaOATC, .reiniciarOATC, .clickeable-cliente');
+        if (!target) return;
+
+        // Grupo 1: Ediciones y Modales
+        if (target.matches(".asignarActivarModalBtn, .editarClienteOATC, .clickeable-cliente, .editarTipoAtencionOATC, .ponerEnEsperaOATC, .btnAbrirNotasOATC, .btnEnviarCaja, .eliminarOATC")) { 
+          if (window.handleOATCMultiClick) {
+            window.handleOATCMultiClick(e);
+          }
+        } 
+        
+        // Grupo 2: Acciones Directas
+        else if (target.matches(".resolverOATC, .terminarATCBtn, .activarAsesoriaOATC, .reiniciarOATC")) {
+          if (window.handleOATCButtonClick) {
+            window.handleOATCButtonClick(e);
+          }
+        }
+      });
+    });
+
+    /**
+     * MODULO DE SEGURIDAD SPA
+     */
+    function intentarDesbloquearSPA(event) {
+      if (event) event.preventDefault();
+      
+      const user = document.getElementById("lockUsername").value.trim();
+      const pass = document.getElementById("lockPassword").value.trim();
+      const spinner = document.getElementById("lockSpinner");
+
+      console.log("DEBUG SPA: Intentando autenticar usuario:", user);
+      spinner.style.display = "flex";
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          console.log("DEBUG SPA: Respuesta de autenticarUsuario:", res);
+          spinner.style.display = "none";
+          
+          if (res && res.success) {
+            localStorage.setItem("user_token", res.token);
+            localStorage.setItem("user_role", res.rol);
+            localStorage.setItem("user_name", res.nombre);
+
+            Swal.fire({
+              icon: 'success',
+              title: '¡Acceso Concedido!',
+              text: `Bienvenido(a), ${res.nombre}.`,
+              timer: 1500,
+              showConfirmButton: false
+            }).then(() => {
+              desbloquearIUConSesion(res.rol);
+            });
+          } else {
+            Swal.fire({
+              icon: 'error',
+              title: 'Credenciales Incorrectas',
+              text: res.message || 'Verifique sus datos e intente nuevamente.'
+            });
+          }
+        })
+        .withFailureHandler(function(err) {
+          spinner.style.display = "none";
+          Swal.fire({
+            icon: 'error',
+            title: 'Error del Servidor',
+            text: err.message || 'No se pudo comunicar con el validador.'
+          });
+        })
+        .autenticarUsuario(user, pass);
+    }
+
+    function desbloquearIUConSesion(rol) {
+      console.log("DEBUG SPA: Desbloqueando interfaz para rol:", rol);
+      document.getElementById("pantallaBloqueo").style.display = "none";
+
+      // Reset visibility of special navigation links
+      const menuCaja = document.getElementById("navCaja");
+      const menuInsumos = document.getElementById("navInsumos");
+      const menuReportes = document.getElementById("navReportes");
+      if (menuCaja) menuCaja.style.display = "none";
+      if (menuInsumos) menuInsumos.style.display = "none";
+      if (menuReportes) menuReportes.style.display = "none";
+
+      if (rol === 'desarrollador') {
+        const nav = document.getElementById("mainNavbar");
+        if (nav) nav.style.display = "none";
+        document.getElementById("displayDevLayout").style.display = "block";
+        document.getElementById("displayLayout").style.display = "none";
+        console.log("DEBUG SPA: Cargando Panel del Desarrollador...");
+      } else if (rol === 'recepcion' || rol === 'admin' || rol === 'administrador' || rol === 'caja' || rol === 'operacion') {
+        const nav = document.getElementById("mainNavbar");
+        if (nav) nav.style.display = ""; // Remove display: none to default to Bootstrap stylesheet layout (flex)
+        document.getElementById("displayDevLayout").style.display = "none";
+
+        // Show/hide menu items based on role permissions
+        if (rol === 'admin' || rol === 'administrador') {
+          if (menuCaja) menuCaja.style.display = "block";
+          if (menuInsumos) menuInsumos.style.display = "block";
+          if (menuReportes) menuReportes.style.display = "block";
+        } else if (rol === 'caja') {
+          if (menuCaja) menuCaja.style.display = "block";
+        } else if (rol === 'operacion') {
+          if (menuInsumos) menuInsumos.style.display = "block";
+        }
+        
+        // Consultar el parámetro de pestaña solicitado en la URL y cambiar de vista de forma segura
+        if (typeof google !== 'undefined' && google.script && google.script.url) {
+          google.script.url.getLocation(function(location) {
+            const p = location.parameter.p || 'recepcion';
+            console.log("DEBUG: Redirigiendo en SPA a la pestaña inicial:", p);
+            // Verificar permisos del rol para la pestaña solicitada
+            if (p === 'caja' && rol !== 'admin' && rol !== 'administrador' && rol !== 'caja') {
+              cambiarDashboard('recepcion');
+            } else if (p === 'insumos' && rol !== 'admin' && rol !== 'administrador' && rol !== 'operacion') {
+              cambiarDashboard('recepcion');
+            } else if (p === 'reportes' && rol !== 'admin' && rol !== 'administrador') {
+              cambiarDashboard('recepcion');
+            } else {
+              cambiarDashboard(p);
+            }
+          });
+        } else {
+          cambiarDashboard('recepcion');
+        }
+      } else {
+        console.error("DEBUG SPA: Rol desconocido detectado:", rol);
+        localStorage.clear();
+        document.getElementById("pantallaBloqueo").style.display = "flex";
+      }
+    }
+
+    function cerrarSistema() {
+      console.log("DEBUG SPA: Cerrando sesión de usuario...");
+      localStorage.clear();
+      
+      document.getElementById("displayLayout").style.display = "none";
+      document.getElementById("displayDevLayout").style.display = "none";
+      
+      // Ocultar también todos los demás layouts de pestañas SPA
+      const caja = document.getElementById("displayCajaLayout");
+      const insumos = document.getElementById("displayInsumosLayout");
+      const reportes = document.getElementById("displayReportesLayout");
+      if (caja) caja.style.display = "none";
+      if (insumos) insumos.style.display = "none";
+      if (reportes) reportes.style.display = "none";
+
+      const nav = document.getElementById("mainNavbar");
+      if (nav) nav.style.display = "none";
+      
+      document.getElementById("lockUsername").value = "";
+      document.getElementById("lockPassword").value = "";
+      
+      document.getElementById("pantallaBloqueo").style.display = "flex";
+    }
+    
+    function mostrarCargando() {
+      const overlay = document.getElementById('loading-overlay');
+      if (overlay) {
+        overlay.style.setProperty('display', 'flex', 'important');
+        overlay.style.pointerEvents = 'all';
+      }
+    }
+
+    function ocultarCargando() {
+      const overlay = document.getElementById('loading-overlay');
+      if (overlay) {
+        overlay.style.display = 'none';
+        overlay.style.pointerEvents = 'none';
+      }
+    }
+
+    function loadLoads() {
+      console.log("DEBUG(Servidor): Sincronizando datos de hoy secuencialmente...");
+      
+      setTimeout(() => {
+        loadInfoDataList();
+      }, 100);
+
+      setTimeout(() => {
+        loadInfoDataListClientes();
+      }, 500);
+
+      setTimeout(() => {
+        loadInfoDataListAgentesActivos();
+      }, 900);
+
+      setTimeout(() => {
+        if (window.cargarListaProductosVenta) window.cargarListaProductosVenta();
+        ajustarFechaAlCargar();
+      }, 1300);
+
+      setTimeout(() => {
+        obtenerSiguienteNumeroOATC();
+
+        google.script.run
+          .withSuccessHandler(function(respuesta) {
+            console.log("DEBUG: Migración de citas completada exitosamente.");
+            if (typeof window.filtrarView === 'function') window.filtrarView();
+            if (typeof window.filtrarViewOATCPendientes === 'function') {
+              window.filtroOATCActivo = 'Pendientes';
+              window.filtrarViewOATCPendientes();
+            }
+            iniciarSondeoDeDatos(); 
+            ocultarCargando();
+          })
+          .withFailureHandler(err => { 
+            ocultarCargando(); 
+            window.onFailureConexion(err); 
+          })
+          .migrarCitasDeHoy();
+      }, 1700);
+    }
+
+    function iniciarSondeoDeDatos() {
+      console.log(`[SISTEMA] Polling activado: cada ${INTERVALO_SONDEO / 1000}s`);
+      
+      setInterval(function() {
+        const modalAbierto = document.querySelector('.modal.show');
+        const swalAbierto = document.querySelector('.swal2-container');
+
+        if (!modalAbierto && !swalAbierto) {
+          console.log("[POLLING] Sincronización silenciosa...");
+          
+          google.script.run
+            .withSuccessHandler(res => {
+                if (res && res.success) {
+                  if (window.renderizarTablaAgentes && res.agentes) {
+                    window.renderizarTablaAgentes(res.agentes);
+                  } else if (window.filtrarView) {
+                    window.filtrarView(true); 
+                  }
+                  
+                  if (window.filtroOATCActivo === 'Pendientes' && res.oatc) {
+                    if (window.renderizarTablaOATC) {
+                      window.renderizarTablaOATC(res.oatc);
+                    } else if (window.filtrarViewOATCPendientes) {
+                      window.filtrarViewOATCPendientes(true);
+                    }
+                  }
+                  console.log("[POLLING] Sincronizado.");
+                }
+              })
+            .dispararSondeoSilencioso(); 
+        }
+
+        google.script.run
+          .withSuccessHandler(id => {
+            const campoId = document.getElementById('floatingInputNumeroOATC');
+            const clienteInput = document.getElementById('clientesDatalistOATC');
+            
+            if (campoId && id && id !== "Error" && (!clienteInput || clienteInput.value === "")) {
+                if (campoId.value !== id) {
+                  campoId.value = id;
+                  console.log("[POLLING] Nuevo ID detectado: " + id);
+                }
+            }
+          })
+          .obtenerNumeroLastOATC(); 
+
+      }, INTERVALO_SONDEO); 
+    }
+
+    function ajustarFechaAlCargar() {
+      const today = new Date();
+      const dia = String(today.getDate()).padStart(2, '0');
+      const mes = String(today.getMonth() + 1).padStart(2, '0');
+      const fecha = `${dia}/${mes}/${today.getFullYear()}`;
+      
+      const input = document.getElementById('datePicker');
+      if (input) input.value = fecha;
+    }
+
+    function loadInfoDataList() { 
+      google.script.run.withSuccessHandler(cargarDataList).obtenerListaAgentes(); 
+    }
+    
+    function cargarDataList(lista) {
+      const dl = document.getElementById("datalistAgentes");
+      if (dl) {
+        dl.innerHTML = (lista || []).map(a => `<option value="${a.apodo}">${a.especialidad}</option>`).join('');
+      }
+    }
+
+    function loadInfoDataListClientes() { 
+      google.script.run.withSuccessHandler(loadClientesDataList).obtenerListaClientes(); 
+    }
+    
+    function loadClientesDataList(lista) {
+      const dl = document.getElementById("datalistClientes");
+      if (dl && lista) {
+        dl.innerHTML = lista.map(c => 
+          `<option value="${c[0]} ${c[1]} | DNI:${c[2]} | CEL:${c[4]}">`
+        ).join('');
+      }
+    }
+
+    function loadInfoDataListAgentesActivos() { 
+      google.script.run.withSuccessHandler(loadAgentesADataList).obtenerListaAgentesA(); 
+    }
+    
+    function loadAgentesADataList(lista) {
+      const dl = document.getElementById("datalistAgentesA");
+      if (dl) {
+        dl.innerHTML = (lista || []).map(a => `<option value="${a.apodo}">${a.especialidad}</option>`).join('');
+      }
+    }
+
+    function obtenerSiguienteNumeroOATC() { 
+      google.script.run.withSuccessHandler(colocarSigNumOATC).obtenerNumeroLastOATC(); 
+    }
+    
+    function colocarSigNumOATC(n) { 
+      const i = document.getElementById("floatingInputNumeroOATC"); 
+      if (i) i.value = n; 
+    }
+
+    function onFailureConexion(error) {
+      ocultarCargando();
+      console.error("CRÍTICO: Error de red o servidor:", error);
+      if (window.Swal) {
+          Swal.fire({
+              icon: 'error',
+              title: 'Conexión Inestable',
+              text: 'No se pudo comunicar con el servidor.',
+              footer: error.message || ''
+          });
+      } else {
+          alert("❌ Error del Servidor: " + (error.message || "Fallo en la conexión."));
+      }
+    }
+
+    function actualizarVistasPostAccion(respuesta, esSilencioso = false) {
+      if (window.filtrarViewOATCPendientes) window.filtrarViewOATCPendientes(esSilencioso);
+      if (window.filtrarView) window.filtrarView(esSilencioso);
+
+      if (window.loadInfoDataListAgentesActivos) window.loadInfoDataListAgentesActivos();
+      if (window.loadInfoDataListClientes) window.loadInfoDataListClientes();
+
+      if (!esSilencioso) {
+        ocultarCargando();
+        if (typeof respuesta === 'string' && respuesta !== "") {
+          Swal.fire({ icon: 'success', title: 'Éxito', text: respuesta, timer: 1500, showConfirmButton: false });
+        }
+      }
+    }
+
+    function cambiarDashboard(vista) {
+      console.log("DEBUG SPA: Cambiando vista a:", vista);
+      
+      // Ocultar todos los paneles
+      document.getElementById("displayLayout").style.display = "none";
+      document.getElementById("displayDevLayout").style.display = "none";
+      document.getElementById("displayCajaLayout").style.display = "none";
+      document.getElementById("displayInsumosLayout").style.display = "none";
+      document.getElementById("displayReportesLayout").style.display = "none";
+
+      // Desactivar enlaces activos en navbar
+      document.querySelectorAll(".navbar-nav .nav-link").forEach(link => link.classList.remove("active"));
+
+      if (vista === 'recepcion') {
+        document.getElementById("displayLayout").style.display = "block";
+        const el = document.querySelector("#navRecepcion .nav-link");
+        if (el) el.classList.add("active");
+        setTimeout(loadLoads, 100);
+      } else if (vista === 'caja') {
+        document.getElementById("displayCajaLayout").style.display = "block";
+        const el = document.querySelector("#navCaja .nav-link");
+        if (el) el.classList.add("active");
+        cargarDatosCaja();
+      } else if (vista === 'insumos') {
+        document.getElementById("displayInsumosLayout").style.display = "block";
+        const el = document.querySelector("#navInsumos .nav-link");
+        if (el) el.classList.add("active");
+        cargarInsumos();
+        cargarDespachos();
+      } else if (vista === 'reportes') {
+        document.getElementById("displayReportesLayout").style.display = "block";
+        const el = document.querySelector("#navReportes .nav-link");
+        if (el) el.classList.add("active");
+        cargarReportes();
+      }
+    }
+
+    // --- CAJA ---
+    function cargarDatosCaja() {
+      mostrarCargando();
+      google.script.run
+        .withSuccessHandler(function(data) {
+          ocultarCargando();
+          const body = document.getElementById('cajaVentasBody');
+          if (!body) return;
+          if (!data || data.length === 0) {
+            body.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No se registran transacciones el día de hoy.</td></tr>';
+            return;
+          }
+
+          let total = 0;
+          body.innerHTML = data.map(item => {
+            const monto = parseFloat(item.monto_final) || 0;
+            total += monto;
+            return `
+              <tr>
+                <td><span class="badge bg-dark fw-bold">${item.ticket_id || 'N/A'}</span></td>
+                <td>${new Date(item.created_at).toLocaleString('es-PE')}</td>
+                <td>${item.cliente_id || 'Cliente General'}</td>
+                <td>${item.servicio_final || item.servicio_original || '-'}</td>
+                <td class="fw-bold text-success">S/ ${monto.toFixed(2)}</td>
+                <td><span class="badge bg-success">${item.estado || 'Pagado'}</span></td>
+              </tr>
+            `;
+          }).join('');
+
+          const totalEl = document.getElementById('cajaTotalVentas');
+          const countEl = document.getElementById('cajaServiciosCount');
+          if (totalEl) totalEl.innerText = 'S/ ' + total.toFixed(2);
+          if (countEl) countEl.innerText = data.length;
+        })
+        .withFailureHandler(function(err) {
+          ocultarCargando();
+          Swal.fire("Error", "Error al consultar ventas de caja: " + err.message, "error");
+        })
+        .obtenerVentasCajaHoy();
+    }
+
+    function abrirCierreCaja() {
+      Swal.fire({
+        title: '¿Realizar Cierre de Caja?',
+        text: "Esto registrará el balance final de la fecha y congelará los registros actuales.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Sí, Cerrar Caja',
+        cancelButtonText: 'Cancelar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          Swal.fire('¡Caja Cerrada!', 'El cierre se ha registrado exitosamente.', 'success');
+        }
+      });
+    }
+
+    // --- INSUMOS ---
+    function cargarInsumos() {
+      google.script.run
+        .withSuccessHandler(function(insumos) {
+          const body = document.getElementById('tablaInsumosBody');
+          const select = document.getElementById('despachoInsumoId');
+          if (!body || !select) return;
+          
+          if (!insumos || insumos.length === 0) {
+            body.innerHTML = '<tr><td colspan="3" class="text-center py-3 text-muted">No hay insumos registrados.</td></tr>';
+            select.innerHTML = '<option value="">No hay insumos disponibles</option>';
+            return;
+          }
+
+          body.innerHTML = insumos.map(ins => `
+            <tr>
+              <td class="fw-bold">${ins.nombre}</td>
+              <td><span class="badge ${ins.stock > 5 ? 'bg-success' : 'bg-danger'}">${ins.stock}</span></td>
+              <td>${ins.unidad_medida}</td>
+            </tr>
+          `).join('');
+
+          select.innerHTML = '<option value="">-- Seleccionar --</option>' + insumos.map(ins => `
+            <option value="${ins.id}">${ins.nombre} (${ins.stock} ${ins.unidad_medida} disponibles)</option>
+          `).join('');
+        })
+        .obtenerInsumosInventario();
+    }
+
+    function cargarDespachos() {
+      google.script.run
+        .withSuccessHandler(function(despachos) {
+          const body = document.getElementById('tablaDespachosBody');
+          if (!body) return;
+          if (!despachos || despachos.length === 0) {
+            body.innerHTML = '<tr><td colspan="4" class="text-center py-3 text-muted">No se registran despachos.</td></tr>';
+            return;
+          }
+
+          body.innerHTML = despachos.map(des => `
+            <tr>
+              <td>${new Date(des.fecha_despacho).toLocaleDateString('es-PE')}</td>
+              <td class="fw-bold">${des.insumo_nombre}</td>
+              <td>${des.cantidad}</td>
+              <td>${des.destino || des.notas || '-'}</td>
+            </tr>
+          `).join('');
+        })
+        .obtenerDespachosRecientes();
+    }
+
+    function registrarNuevoInsumo(e) {
+      if (e) e.preventDefault();
+      const payload = {
+        nombre: document.getElementById('insumoNombre').value,
+        unidad_medida: document.getElementById('insumoUnidad').value,
+        stock: parseInt(document.getElementById('insumoStock').value)
+      };
+
+      mostrarCargando();
+      google.script.run
+        .withSuccessHandler(function() {
+          ocultarCargando();
+          Swal.fire("Registrado", "El insumo ha sido ingresado correctamente.", "success");
+          document.getElementById('formNuevoInsumo').reset();
+          cargarInsumos();
+        })
+        .registrarInsumoServidor(payload);
+    }
+
+    function registrarDespacho(e) {
+      if (e) e.preventDefault();
+      const payload = {
+        insumo_id: parseInt(document.getElementById('despachoInsumoId').value),
+        cantidad: parseInt(document.getElementById('despachoCantidad').value),
+        destino: document.getElementById('despachoNotas').value
+      };
+
+      mostrarCargando();
+      google.script.run
+        .withSuccessHandler(function() {
+          ocultarCargando();
+          Swal.fire("Despachado", "El stock de insumo ha sido actualizado.", "success");
+          document.getElementById('formDespacho').reset();
+          cargarInsumos();
+          cargarDespachos();
+        })
+        .withFailureHandler(function(err) {
+          ocultarCargando();
+          Swal.fire("Error", err.message, "error");
+        })
+        .registrarDespachoServidor(payload);
+    }
+
+    // --- REPORTES ---
+    let chartBarInstance = null;
+    let chartPieInstance = null;
+
+    function cargarReportes() {
+      mostrarCargando();
+      google.script.run
+        .withSuccessHandler(function(data) {
+          ocultarCargando();
+          
+          const repCitasHoy = document.getElementById('repCitasHoy');
+          const repFacturacionHoy = document.getElementById('repFacturacionHoy');
+          const repOrdenesActivas = document.getElementById('repOrdenesActivas');
+          const repInsumosCriticos = document.getElementById('repInsumosCriticos');
+
+          if (repCitasHoy) repCitasHoy.innerText = data.citasHoy || 0;
+          if (repFacturacionHoy) repFacturacionHoy.innerText = 'S/ ' + (data.facturacionHoy || 0).toFixed(2);
+          if (repOrdenesActivas) repOrdenesActivas.innerText = data.ordenesActivas || 0;
+          if (repInsumosCriticos) repInsumosCriticos.innerText = data.insumosCriticos || 0;
+
+          // Destruir gráficos previos si existen
+          if (chartBarInstance) chartBarInstance.destroy();
+          if (chartPieInstance) chartPieInstance.destroy();
+
+          // Renderizar Gráfico de Barra
+          const canvasBar = document.getElementById('chartFacturacionEstilistas');
+          if (canvasBar) {
+            const ctxBar = canvasBar.getContext('2d');
+            chartBarInstance = new Chart(ctxBar, {
+              type: 'bar',
+              data: {
+                labels: data.estilistasNombres || [],
+                datasets: [{
+                  label: 'Monto Total Facturado (S/)',
+                  data: data.estilistasFacturacion || [],
+                  backgroundColor: 'rgba(111, 66, 193, 0.7)',
+                  borderColor: 'rgba(111, 66, 193, 1)',
+                  borderWidth: 1
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                  y: { beginAtZero: true }
+                }
+              }
+            });
+          }
+
+          // Renderizar Gráfico de Torta
+          const canvasPie = document.getElementById('chartTiposServicio');
+          if (canvasPie) {
+            const ctxPie = canvasPie.getContext('2d');
+            chartPieInstance = new Chart(ctxPie, {
+              type: 'pie',
+              data: {
+                labels: data.serviciosCategorias || [],
+                datasets: [{
+                  data: data.serviciosCantidades || [],
+                  backgroundColor: [
+                    '#ff6384', '#36a2eb', '#cc65fe', '#ffce56', '#4bc0c0', '#afdf22'
+                  ]
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false
+              }
+            });
+          }
+        })
+        .withFailureHandler(function(err) {
+          ocultarCargando();
+          Swal.fire("Error", "No se pudieron obtener datos de reportes: " + err.message, "error");
+        })
+        .obtenerDatosResumenReportes();
+    }
+
+    window.onFailureConexion = onFailureConexion;
+    window.actualizarVistasPostAccion = actualizarVistasPostAccion;
+    window.loadInfoDataListAgentesActivos = loadInfoDataListAgentesActivos;
+    
+    window.intentarDesbloquearSPA = intentarDesbloquearSPA;
+    window.desbloquearIUConSesion = desbloquearIUConSesion;
+    window.cerrarSistema = cerrarSistema;
+    
+    window.ocultarCargando = ocultarCargando; 
+    window.mostrarCargando = mostrarCargando;
+    window.ocultarSpinner = ocultarCargando; 
+    window.mostrarSpinner = mostrarCargando;
+    
+    window.loadLoads = loadLoads;
+    
+    // SPA Dashboard navigation exposes
+    window.cambiarDashboard = cambiarDashboard;
+    window.cargarDatosCaja = cargarDatosCaja;
+    window.abrirCierreCaja = abrirCierreCaja;
+    window.cargarInsumos = cargarInsumos;
+    window.cargarDespachos = cargarDespachos;
+    window.registrarNuevoInsumo = registrarNuevoInsumo;
+    window.registrarDespacho = registrarDespacho;
+    window.cargarReportes = cargarReportes;
+})();
+</script>

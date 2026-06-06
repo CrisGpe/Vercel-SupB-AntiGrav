@@ -1,0 +1,380 @@
+<script>
+/**
+ * --- SISTEMA DE GESTIÓN DE AGENTES (MÓDULO INTEGRAL) ---
+ * Este archivo centraliza la lógica de visualización, creación, edición
+ * y borrado lógico/físico del personal operativo.
+ */
+(function() {
+
+    // --- INSTANCIAS GLOBALES DE BOOTSTRAP ---
+    // Se mantienen fuera del DOMContentLoaded para accesibilidad interna
+    let modalAgentesBootstrap;
+    let modalFormularioAgenteBootstrap;
+
+    /**
+     * Inicialización del módulo al cargar el DOM.
+     * Configura los disparadores de eventos y registra las instancias de los modales.
+     */
+    document.addEventListener('DOMContentLoaded', () => {
+        
+        // 1. Registro del Modal Principal (Listado)
+        const modalAgentesElement = document.getElementById('modalAgentes');
+        if (modalAgentesElement) {
+            modalAgentesBootstrap = new bootstrap.Modal(modalAgentesElement, {
+                backdrop: 'static', // Evita cierre accidental
+                keyboard: false
+            });
+        }
+
+        // 2. Registro del Modal de Formulario (Alta/Edición)
+        const modalFormularioAgenteElement = document.getElementById('modalFormularioAgente');
+        if (modalFormularioAgenteElement) {
+            modalFormularioAgenteBootstrap = new bootstrap.Modal(modalFormularioAgenteElement, {
+                backdrop: 'static'
+            });
+        }
+        
+        // 3. Configuración de Listeners para botones de interfaz
+        const btnAgentes = document.getElementById('btnAgentes');
+        if (btnAgentes) {
+            btnAgentes.addEventListener('click', function() {
+                console.log("[Módulo Agentes]: Iniciando vista de gestión...");
+                window.abrirModalAgentes();
+            });
+        }
+        
+        const btnAbrirModalNuevoAgente = document.getElementById('btnAbrirModalNuevoAgente');
+        if (btnAbrirModalNuevoAgente) {
+            btnAbrirModalNuevoAgente.addEventListener('click', function() {
+                window.abrirModalFormularioAgente('agregar');
+            });
+        }
+
+        console.log("[Módulo Agentes]: Inicializado correctamente.");
+    });
+
+    /**
+     * Helper avanzado para formateo de tiempos.
+     * Convierte objetos Date de Google Apps Script o strings ambiguos a formato HH:mm.
+     */
+    const formatoHoraProfesional = (valor) => {
+        // Manejo de valores nulos o vacíos representados por guiones en la hoja
+        if (!valor || String(valor).trim() === '-' || String(valor).trim() === '') {
+            return '';
+        }
+
+        // Si el valor es un objeto Date (común en transferencias de Apps Script)
+        if (valor instanceof Date) {
+            try {
+                const horas = valor.getHours().toString().padStart(2, '0');
+                const minutos = valor.getMinutes().toString().padStart(2, '0');
+                return `${horas}:${minutos}`;
+            } catch (err) {
+                console.error("Error al procesar objeto Date de hora:", err);
+                return '';
+            }
+        }
+        
+        // Si el valor es un string con formato regional (ej: "10:00 p. m.")
+        const valorStr = String(valor).trim();
+        if (valorStr.match(/\d{1,2}(a|p)\.\s?m\./i)) {
+            // Limpieza de caracteres especiales para estandarización
+            return valorStr.replace(/\s*\.\s*/g, '.').replace(/\s+/g, ' '); 
+        }
+
+        return valorStr; 
+    };
+
+    // --- MÉTODOS DE LA VISTA PRINCIPAL (LISTADO) ---
+
+    /**
+     * Expone la apertura del modal al ámbito global.
+     */
+    window.abrirModalAgentes = () => {
+        if (!modalAgentesBootstrap) {
+            console.error("Error: Instancia de modalAgentes no encontrada.");
+            return;
+        }
+        modalAgentesBootstrap.show();
+        window.cargarAgentesEnModal(); 
+    };
+
+    window.cerrarModalAgentes = () => {
+        if (modalAgentesBootstrap) modalAgentesBootstrap.hide();
+    };
+
+    window.cerrarModalFormularioAgente = () => {
+        if (modalFormularioAgenteBootstrap) modalFormularioAgenteBootstrap.hide();
+    };
+
+    /**
+     * Solicita al servidor el array de agentes y gestiona el estado de carga en la tabla.
+     */
+    window.cargarAgentesEnModal = () => {
+        const tbody = document.getElementById('tablaAgentesBody');
+        if (!tbody) return;
+
+        // Mostrar estado de carga visual dentro de la tabla
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="10" class="text-center py-5">
+                    <div class="spinner-border text-primary mb-2" role="status"></div>
+                    <p class="text-muted">Obteniendo base de datos de agentes...</p>
+                </td>
+            </tr>`;
+        
+        google.script.run
+            .withSuccessHandler((agentes) => {
+                console.log("[Módulo Agentes]: Datos recuperados. Cantidad:", agentes.length);
+                window.renderizarTablaAgentes(agentes);
+            })
+            .withFailureHandler((error) => {
+                console.error("Error crítico de comunicación:", error);
+                tbody.innerHTML = `<tr><td colspan="10" class="text-danger text-center">Fallo al conectar con el servidor: ${error}</td></tr>`;
+                Swal.fire('Error de Conexión', 'No se pudieron recuperar los agentes.', 'error');
+            })
+            .obtenerDatosAgentes();
+    };
+
+    /**
+     * Renderiza dinámicamente las filas de la tabla utilizando un Template HTML.
+     */
+    window.renderizarTablaAgentes = (agentes) => {
+        const tbody = document.getElementById('tablaAgentesBody');
+        const template = document.getElementById('filaAgenteTemplate');
+        
+        if (!tbody || !template) {
+            console.error("Error: Elementos del DOM para la tabla no encontrados.");
+            return;
+        }
+
+        tbody.innerHTML = ''; // Limpieza de filas previas
+
+        if (!agentes || agentes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No se encontraron agentes en el registro.</td></tr>';
+            return;
+        }
+
+        // Uso de fragment para minimizar el reflujo (reflow) del navegador
+        const fragmento = document.createDocumentFragment();
+
+        agentes.forEach(agente => {
+            try {
+                const fila = document.importNode(template.content, true);
+                
+                // Mapeo de datos a las clases del template
+                fila.querySelector('.agenteID').textContent = agente.id || '---';
+                fila.querySelector('.agenteNombre').textContent = agente.nombreCompleto || 'Sin nombre';
+                fila.querySelector('.agenteApodo').textContent = agente.apodo || '-';
+                fila.querySelector('.agenteDNI').textContent = agente.dni || '-';
+                fila.querySelector('.agenteEspecialidad').textContent = agente.especialidad || 'General';
+                
+                // Formateo de estado con estilo visual (Badge)
+                const celdaEstado = fila.querySelector('.agenteEstado');
+                if (celdaEstado) {
+                    celdaEstado.textContent = agente.estado;
+                    celdaEstado.className = `agenteEstado badge ${agente.estado === 'ACTIVO' ? 'bg-success' : 'bg-warning text-dark'}`;
+                }
+                
+                // Procesamiento de horarios
+                fila.querySelector('.agenteIngreso').textContent = formatoHoraProfesional(agente.ingreso);
+                fila.querySelector('.agenteSalida').textContent = formatoHoraProfesional(agente.salida);
+                fila.querySelector('.agenteDiaDesc').textContent = agente.diadesc || 'No asignado';
+                
+                // Inyección de eventos en botones de acción
+                fila.querySelector('.btn-editar-agente').onclick = () => {
+                    window.abrirModalFormularioAgente('editar', agente.id);
+                };
+
+                fila.querySelector('.btn-eliminar-agente').onclick = () => {
+                    window.confirmarEliminarAgente(agente.id, agente.nombreCompleto);
+                };
+
+                fragmento.appendChild(fila);
+
+            } catch (err) {
+                console.error(`Error al procesar fila del agente ID ${agente.id}:`, err);
+            }
+        });
+
+        tbody.appendChild(fragmento);
+    };
+
+    // --- MÉTODOS DEL FORMULARIO (ALTA / EDICIÓN) ---
+
+    /**
+     * Controla la lógica de apertura del formulario según el modo solicitado.
+     */
+    window.abrirModalFormularioAgente = (modo, agenteId = null) => {
+        const formulario = document.getElementById('formularioAgente');
+        const tituloLabel = document.getElementById('modalFormularioAgenteLabel');
+        const statusDiv = document.getElementById('statusMessageModalAgente');
+        const inputIdOculto = document.getElementById('agenteIdOculto');
+
+        if (!formulario || !tituloLabel || !inputIdOculto) return;
+
+        // Reset completo de estados previos
+        formulario.reset();
+        if (statusDiv) {
+            statusDiv.style.display = 'none';
+            statusDiv.textContent = '';
+        }
+
+        if (modo === 'agregar') {
+            tituloLabel.textContent = '➕ Registrar Nuevo Agente Operativo';
+            inputIdOculto.value = ''; // Indica creación
+            modalFormularioAgenteBootstrap.show();
+        } 
+        else if (modo === 'editar' && agenteId) {
+            tituloLabel.textContent = `📝 Actualizar Datos (Ficha: ${agenteId})`;
+            inputIdOculto.value = agenteId; // Indica edición
+            
+            // Efecto de carga previo a mostrar el modal
+            if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+            google.script.run
+                .withSuccessHandler((agente) => {
+                    if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+                    window.rellenarCamposFormulario(agente);
+                    modalFormularioAgenteBootstrap.show();
+                })
+                .withFailureHandler((err) => {
+                    if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+                    Swal.fire('Error', 'No se pudo cargar la información del agente para editar.', 'error');
+                })
+                .obtenerDatosAgentePorId(agenteId);
+        }
+    };
+
+    /**
+     * Mapea un objeto Agente a los inputs específicos del formulario.
+     */
+    window.rellenarCamposFormulario = (agente) => {
+        if (!agente) return;
+        
+        try {
+            document.getElementById('nombreCompletoInput').value = agente.nombreCompleto || '';
+            document.getElementById('dniInput').value = agente.dni || '';
+            document.getElementById('apodoInput').value = agente.apodo || '';
+            document.getElementById('especialidadInput').value = agente.especialidad || '';
+            document.getElementById('estadoInput').value = agente.estado || 'ACTIVO';
+            document.getElementById('diaDescInput').value = agente.diadesc || '';
+            
+            // Función interna para asegurar formato compatible con <input type="time">
+            const formatParaInputTime = (v) => {
+                if (v instanceof Date) {
+                    return v.getHours().toString().padStart(2, '0') + ':' + v.getMinutes().toString().padStart(2, '0');
+                }
+                return (typeof v === 'string' && v.match(/^\d{2}:\d{2}$/)) ? v : '';
+            };
+
+            document.getElementById('ingresoInput').value = formatParaInputTime(agente.ingreso);
+            document.getElementById('salidaInput').value = formatParaInputTime(agente.salida);
+        } catch (e) {
+            console.error("Error al poblar formulario:", e);
+        }
+    };
+
+    /**
+     * Procesa la validación y el envío de datos al servidor.
+     */
+    window.guardarAgente = () => {
+        const id = document.getElementById('agenteIdOculto').value;
+        const nombreInput = document.getElementById('nombreCompletoInput');
+        const especialidadInput = document.getElementById('especialidadInput');
+
+        // Validaciones estrictas antes de enviar
+        if (!nombreInput.value.trim() || !especialidadInput.value) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Campos Obligatorios',
+                text: 'El nombre completo y la especialidad son requeridos para guardar.',
+                confirmButtonColor: '#3085d6'
+            });
+            return;
+        }
+
+        const datosAgente = {
+            id: id,
+            nombreCompleto: nombreInput.value.trim(),
+            dni: document.getElementById('dniInput').value.trim(),
+            apodo: document.getElementById('apodoInput').value.trim(),
+            especialidad: especialidadInput.value,
+            estado: document.getElementById('estadoInput').value,
+            ingreso: document.getElementById('ingresoInput').value,
+            salida: document.getElementById('salidaInput').value,
+            diadesc: document.getElementById('diaDescInput').value,
+        };
+
+        // UI Feedback
+        const btnGuardar = document.getElementById('btnGuardarAgente');
+        if (btnGuardar) btnGuardar.disabled = true;
+        if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+        google.script.run
+            .withSuccessHandler((resultado) => {
+                if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+                if (btnGuardar) btnGuardar.disabled = false;
+
+                if (resultado.exito) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Éxito',
+                        text: resultado.mensaje,
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    modalFormularioAgenteBootstrap.hide();
+                    window.cargarAgentesEnModal(); // Recargar lista automáticamente
+                } else {
+                    Swal.fire('Atención', resultado.mensaje, 'warning');
+                }
+            })
+            .withFailureHandler((error) => {
+                if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+                if (btnGuardar) btnGuardar.disabled = false;
+                Swal.fire('Error del Sistema', 'Fallo al guardar: ' + error, 'error');
+            })
+            .guardarOEditarAgente(datosAgente);
+    };
+
+    /**
+     * Gestiona la eliminación de un agente mediante confirmación de seguridad avanzada.
+     */
+    window.confirmarEliminarAgente = (agenteId, nombre) => {
+        Swal.fire({
+            title: '¿Confirmar eliminación?',
+            text: `Se eliminará permanentemente a: ${nombre}. No podrá recuperar esta ficha.`,
+            icon: 'error',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#aaa',
+            confirmButtonText: 'Sí, eliminar de la base',
+            cancelButtonText: 'Mantener registro'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+                
+                google.script.run
+                    .withSuccessHandler((res) => {
+                        if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+                        
+                        Swal.fire({
+                            title: res.exito ? 'Agente Removido' : 'Error',
+                            text: res.mensaje,
+                            icon: res.exito ? 'success' : 'error'
+                        });
+
+                        if (res.exito) window.cargarAgentesEnModal();
+                    })
+                    .withFailureHandler((err) => {
+                        if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+                        Swal.fire('Error Fatal', err.toString(), 'error');
+                    })
+                    .eliminarAgente(agenteId);
+            }
+        });
+    };
+
+})();
+</script>

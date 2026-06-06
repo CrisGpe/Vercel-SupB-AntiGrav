@@ -1,0 +1,322 @@
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const btn = document.getElementById("btnFidelizacion");
+  if (btn) {
+    btn.addEventListener("click", abrirModalFidelizacion);
+  }
+});
+
+let DATA_CLIENTES_GLOBAL = [];
+
+function abrirModalFidelizacion() {
+  if (window.mostrarCargando) window.mostrarCargando();
+
+  let modalElem = document.getElementById('modalFidelizacion');
+  if (!modalElem) {
+    const html = `
+      <style>
+        /* --- ESTILOS ADAPTATIVOS DE FIDELIZACIÓN (TEMA CLARO Y OSCURO) --- */
+        
+        /* Tema Claro (Por Defecto) */
+        #modalFidelizacion .modal-body {
+          background-color: #f8f9fa !important;
+          color: #212529 !important;
+        }
+        #modalFidelizacion .modal-content {
+          background-color: #ffffff !important;
+        }
+        #modalFidelizacion .header-filter-box,
+        #modalFidelizacion .table-container-box {
+          background-color: #ffffff !important;
+          border-color: #dee2e6 !important;
+        }
+        #modalFidelizacion table {
+          color: #212529 !important;
+        }
+        #modalFidelizacion table td {
+          color: #495057 !important;
+          background-color: transparent !important;
+        }
+        #modalFidelizacion .search-helper-text {
+          color: #6c757d !important;
+        }
+        #modalFidelizacion .dataTables_info,
+        #modalFidelizacion .dataTables_length,
+        #modalFidelizacion .dataTables_filter {
+          color: #495057 !important;
+        }
+        #modalFidelizacion .dataTables_filter input {
+          border: 1px solid #ced4da !important;
+          background-color: #ffffff !important;
+          color: #212529 !important;
+          border-radius: 6px;
+          padding: 4px 8px;
+          outline: none;
+        }
+        #modalFidelizacion .dataTables_paginate .paginate_button {
+          color: #212529 !important;
+        }
+
+        /* Tema Oscuro (Cuando body.dark-theme está activo) */
+        body.dark-theme #modalFidelizacion .modal-body {
+          background-color: #121212 !important;
+          color: #f8f9fa !important;
+        }
+        body.dark-theme #modalFidelizacion .modal-content {
+          background-color: #1e1e1e !important;
+          border: 1px solid #333333 !important;
+        }
+        body.dark-theme #modalFidelizacion .header-filter-box,
+        body.dark-theme #modalFidelizacion .table-container-box {
+          background-color: #1a1a1a !important;
+          border-color: #2d2d2d !important;
+        }
+        body.dark-theme #modalFidelizacion table {
+          color: #ffffff !important;
+        }
+        body.dark-theme #modalFidelizacion table td {
+          color: #e2e8f0 !important;
+          border-bottom: 1px solid #2d2d2d !important;
+          background-color: transparent !important;
+        }
+        body.dark-theme #modalFidelizacion .search-helper-text {
+          color: #a0aec0 !important;
+        }
+        body.dark-theme #modalFidelizacion .dataTables_info,
+        body.dark-theme #modalFidelizacion .dataTables_length,
+        body.dark-theme #modalFidelizacion .dataTables_filter {
+          color: #e2e8f0 !important;
+        }
+        body.dark-theme #modalFidelizacion .dataTables_filter input {
+          border: 1px solid #444444 !important;
+          background-color: #2d2d2d !important;
+          color: #ffffff !important;
+          border-radius: 6px;
+          padding: 4px 8px;
+          outline: none;
+        }
+        body.dark-theme #modalFidelizacion .dataTables_paginate .paginate_button {
+          color: #ffffff !important;
+        }
+      </style>
+      <div class="modal fade" id="modalFidelizacion" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+          <div class="modal-content border-0 rounded-4 overflow-hidden shadow-lg">
+            <div class="modal-header text-white border-0 py-3 px-4 d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #f77062, #fe5196) !important;">
+              <h5 class="modal-title fw-bold text-uppercase fs-5 m-0" style="letter-spacing: 1px;"><i class="fas fa-heart me-2 text-warning"></i>Fidelización de Clientes</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+              <div class="d-flex justify-content-between align-items-center mb-4 p-3 rounded-3 shadow-sm border header-filter-box">
+                <div class="btn-group shadow-sm" id="grupoFiltrosFidelizacion">
+                  <button class="btn btn-outline-secondary active px-4" onclick="filtrarCampana('todas', this)" style="font-weight: 600; border-radius: 8px 0 0 8px;">Todos</button>
+                  <button class="btn btn-outline-primary px-4" onclick="filtrarCampana('Células Madre', this)" style="font-weight: 600;">C. Células Madre</button>
+                  <button class="btn btn-outline-info px-4" onclick="filtrarCampana('Kerastase', this)" style="font-weight: 600; border-radius: 0 8px 8px 0;">C. Kerastase</button>
+                </div>
+              </div>
+              <div class="rounded-4 shadow-sm p-3 border table-container-box">
+                <div class="d-flex justify-content-between align-items-center mb-2 search-helper-container">
+                  <div></div>
+                  <small class="fw-bold search-helper-text" style="font-size: 0.85rem;"><i class="fas fa-search me-1 text-primary"></i>Búsqueda habilitada por Nombre, DNI o Celular</small>
+                </div>
+                <table id="tablaFidelizacion" class="table table-hover align-middle w-100">
+                  <thead>
+                    <tr class="table-dark">
+                      <th style="border-radius: 8px 0 0 8px;">DNI</th>
+                      <th>Cliente</th>
+                      <th>Celular</th>
+                      <th>Fecha Atención</th>
+                      <th class="d-none">Timestamp</th> 
+                      <th class="text-center" style="border-radius: 0 8px 8px 0;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bodyFidelizacion"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      DATA_CLIENTES_GLOBAL = JSON.parse(res);
+      if (window.ocultarCargando) window.ocultarCargando();
+      renderizarTablaFidelizacion(DATA_CLIENTES_GLOBAL);
+      const m = new bootstrap.Modal(document.getElementById('modalFidelizacion'));
+      m.show();
+    })
+    .obtenerDatosFidelizacionCruza();
+}
+
+function renderizarTablaFidelizacion(lista) {
+  const tbody = document.getElementById("bodyFidelizacion");
+  if (!tbody) return;
+
+  if ($.fn.DataTable.isDataTable('#tablaFidelizacion')) {
+    $('#tablaFidelizacion').DataTable().destroy();
+  }
+
+  if (lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">No hay registros para esta vista.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lista.map(c => {
+    // Aseguramos que ultimaVisitaTime exista para no romper el orden
+    const time = c.ultimaVisitaTime || 0;
+    const nombreCompleto = `${c.nombre || ''} ${c.apellido || ''}`.trim();
+    const nombreEscapado = nombreCompleto.replace(/'/g, "\\'");
+
+    return `
+    <tr>
+      <td>${c.dni || '---'}</td>
+      <td>${nombreCompleto}</td>
+      <td>${c.celular || '---'}</td>
+      <td>${c.ultimaVisitaTexto || '---'}</td>
+      <td class="d-none">${time}</td>
+      <td class="text-center">
+        ${c.esCampana 
+          ? `<span class="badge bg-success">En Campaña</span>` 
+          : `<button class="btn btn-sm btn-outline-dark" onclick="verHistorialVisitas('${c.dni}', '${nombreEscapado}')">
+               <i class="fas fa-eye"></i>
+             </button>`
+        }
+      </td>
+    </tr>`;
+  }).join("");
+
+  // Inicialización correcta de DataTable
+  $('#tablaFidelizacion').DataTable({
+    language: { url: 'https://cdn.datatables.net/plug-ins/1.10.25/i18n/Spanish.json' },
+    pageLength: 10,
+    order: [[4, "desc"]], // Ordena por la columna invisible de Timestamp
+    columnDefs: [
+      { targets: [4], visible: false, searchable: false }, // Oculta la columna 5
+      { targets: [5], orderable: false } // Quita flechas de orden a los botones
+    ]
+  });
+}
+
+function filtrarCampana(tipo, elemento) {
+  // Manejo manual del estado 'active' para evitar error de 'event'
+  if (elemento) {
+    const botones = elemento.parentElement.querySelectorAll('.btn');
+    botones.forEach(b => b.classList.remove('active'));
+    elemento.classList.add('active');
+  }
+
+  if (tipo === 'todas') {
+    renderizarTablaFidelizacion(DATA_CLIENTES_GLOBAL);
+    return;
+  }
+
+  if (window.mostrarCargando) window.mostrarCargando();
+  
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (window.ocultarCargando) window.ocultarCargando();
+      renderizarTablaFidelizacion(JSON.parse(res));
+    })
+    .obtenerDatosPorCampana(tipo);
+}
+
+function verHistorialVisitas(dni, nombre) {
+  if (window.mostrarCargando) window.mostrarCargando();
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (window.ocultarCargando) window.ocultarCargando();
+      const visitas = JSON.parse(res);
+      
+      if (!visitas || visitas.length === 0) {
+        Swal.fire({ title: `Historial de ${nombre}`, text: "Sin visitas pendientes.", icon: "info" });
+        return;
+      }
+
+      let tablaHtml = `
+        <div class="table-responsive" style="max-height: 400px;">
+          <table class="table table-sm table-striped table-bordered mt-3" style="font-size: 0.85rem;">
+            <thead class="table-dark text-center">
+              <tr>
+                <th><input type="checkbox" onclick="toggleAllVisitas(this)"></th>
+                <th>Fecha</th>
+                <th>Atención</th>
+                <th>Agente</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${visitas.map(v => `
+                <tr>
+                  <td class="text-center">
+                    <input type="checkbox" class="check-visita" 
+                      data-fecha="${v.fecha}" data-atencion="${v.atencion}" 
+                      data-dni="${dni}" data-nombre="${nombre}">
+                  </td>
+                  <td>${v.fecha}</td>
+                  <td>${v.atencion}</td>
+                  <td>${v.agente}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>`;
+
+      Swal.fire({
+        title: `<i class="fas fa-history"></i> Historial: ${nombre}`,
+        html: tablaHtml,
+        width: '800px',
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: '<i class="fas fa-vial"></i> Células Madre',
+        denyButtonText: '<i class="fas fa-magic"></i> T. Kerastase',
+        cancelButtonText: 'Cerrar',
+        confirmButtonColor: '#0d6efd',
+        denyButtonColor: '#17a2b8'
+      }).then((result) => {
+        if (result.isConfirmed || result.isDenied) {
+          procesarSeleccionCampana(result.isConfirmed ? "Células Madre" : "Kerastase");
+        }
+      });
+    })
+    .obtenerDetalleVisitasCliente(dni);
+}
+
+function toggleAllVisitas(source) {
+  document.querySelectorAll('.check-visita').forEach(cb => cb.checked = source.checked);
+}
+
+function procesarSeleccionCampana(campana) {
+  const seleccionados = [];
+  document.querySelectorAll('.check-visita:checked').forEach(cb => {
+    seleccionados.push({
+      dni: cb.dataset.dni,
+      nombre: cb.dataset.nombre,
+      fechaAtencion: cb.dataset.fecha,
+      servicioOrigen: cb.dataset.atencion,
+      campanaAsignada: campana
+    });
+  });
+
+  if (seleccionados.length === 0) {
+    Swal.fire("Atención", "Selecciona al menos una atención.", "warning");
+    return;
+  }
+
+  if (window.mostrarCargando) window.mostrarCargando();
+
+  const modalFidel = bootstrap.Modal.getInstance(document.getElementById('modalFidelizacion'));
+  
+  google.script.run
+    .withSuccessHandler(() => {
+      if (window.ocultarCargando) window.ocultarCargando();
+      Swal.fire("Éxito", "Campaña registrada correctamente.", "success").then(() => {
+         // Recargamos los datos para que el cliente ya no aparezca en "Pendientes"
+         abrirModalFidelizacion(); 
+      });
+    })
+    .registrarAccionCampana(seleccionados);
+}
+</script>

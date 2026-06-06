@@ -1,0 +1,220 @@
+<script>
+/**
+ * --- GESTIÓN DE MODAL DE CITAS ---
+ * Maneja la lógica de reserva de citas, generación de horarios y envío al servidor.
+ */
+(function() {
+
+    let citaModal; 
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const modalElement = document.getElementById('modalCita');
+        if (modalElement) {
+            citaModal = new bootstrap.Modal(modalElement);
+        }
+        cargarSelectHorarios();
+    });
+
+    /**
+     * Genera horarios en intervalos de 15 min.
+     */
+    function generarOpcionesHora(inicioHora, finHora) {
+      const opciones = [];
+      for (let h = inicioHora; h <= finHora; h++) {
+        for (let m = 0; m < 60; m += 15) {
+          if (h === finHora && m > 0) break;
+          opciones.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+        }
+      }
+      return opciones;
+    }
+
+    /**
+     * Carga el SELECT con formato 12h pero valor 24h.
+     */
+    function cargarSelectHorarios() {
+      const select = document.getElementById('horaInputCitaModal');
+      if (!select) return;
+
+      const horarios = generarOpcionesHora(7, 21); 
+      select.innerHTML = '<option value="" disabled selected>Seleccione una hora</option>';
+
+      const fragment = document.createDocumentFragment();
+      horarios.forEach(hora24h => {
+        const [h, m] = hora24h.split(':');
+        const hNum = parseInt(h, 10);
+        const meridiano = hNum >= 12 ? 'PM' : 'AM';
+        const hora12h = hNum % 12 || 12;
+
+        const option = document.createElement('option');
+        option.value = hora24h;
+        option.textContent = `${hora12h}:${m} ${meridiano}`;
+        fragment.appendChild(option);
+      });
+      select.appendChild(fragment);
+    }
+
+    function abrirModalCita() {
+      const inputFecha = document.getElementById('fechaInputCitaModal');
+      if (inputFecha && !inputFecha.value) {
+        inputFecha.value = new Date().toISOString().split('T')[0];
+      }
+      if (citaModal) citaModal.show();
+    }
+
+    function cerrarModalCita() {
+      if (citaModal) citaModal.hide();
+      // Limpieza masiva de campos
+      ['fechaInputCitaModal', 'horaInputCitaModal', 'clientesDatalistCitaModal', 
+        'agentesDisponiblesDatalistCitaModal', 'tipoOATCDatalistCitaModal'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+      });
+    }
+    
+    /**
+     * Manejador de éxito tras registrar cita
+     */
+    function onSuccessRegistroCita(respuesta) {
+      if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+      
+      cerrarModalCita();
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Cita Agendada',
+        text: respuesta || 'La cita se registró correctamente.',
+        timer: 2500,
+        showConfirmButton: false,
+        timerProgressBar: true
+      });
+
+      if (window.actualizarVistasPostAccion) {
+        window.actualizarVistasPostAccion();
+      }
+    }
+    /**
+     * Elimina una cita tras confirmar con el usuario
+     */
+    function eliminarCita(numFila) {
+      Swal.fire({
+        title: '¿Eliminar cita?',
+        text: "Esta acción no se puede deshacer.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Sí, eliminar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          if (window.mostrarSpinner) window.mostrarSpinner();
+          google.script.run
+            .withSuccessHandler(() => {
+              if (window.ocultarSpinner) window.ocultarSpinner();
+              Swal.fire('Eliminado', 'La cita ha sido borrada.', 'success');
+              // Refrescamos el modal de listado haciendo clic en el botón de filtro
+              document.getElementById('btnFiltrarViewCitasHoy').click();
+            })
+            .eliminarFilaCitaServidor(numFila);
+        }
+      });
+    }
+
+    /**
+     * Carga los datos de una cita en el modal de registro para editarla
+     */
+    function editarCita(numFila) {
+      // 1. Cerramos el modal de listado (donde están los botones)
+      const modalListado = bootstrap.Modal.getInstance(document.getElementById('modalListadoCitas'));
+      if (modalListado) modalListado.hide();
+
+      if (window.mostrarSpinner) window.mostrarSpinner();
+
+      // 2. Buscamos los datos en el servidor para estar seguros
+      google.script.run
+        .withSuccessHandler(datos => {
+          if (window.ocultarSpinner) window.ocultarSpinner();
+          
+          // Abrimos el modal de registro
+          abrirModalCita();
+
+          // 3. Poblamos los campos (Ajusta los IDs según tu HTML del modalCita)
+          document.getElementById('fechaInputCitaModal').value = datos.fecha;
+          document.getElementById('horaInputCitaModal').value = datos.hora;
+          document.getElementById('clientesDatalistCitaModal').value = datos.cliente;
+          document.getElementById('agentesDisponiblesDatalistCitaModal').value = datos.agente;
+          document.getElementById('tipoOATCDatalistCitaModal').value = datos.servicio;
+          
+          // Guardamos el número de fila en un atributo "data" para saber que estamos editando
+          document.getElementById('fechaInputCitaModal').dataset.filaEditar = numFila;
+          
+          // Cambiamos el texto del botón para dar feedback
+          const btnGuardar = document.querySelector('button[onclick="guardarCita()"]');
+          if(btnGuardar) btnGuardar.textContent = "Actualizar Cita";
+        })
+        .obtenerDatosCitaPorFila(numFila);
+    }
+    /**
+     * Recopila y envía el formulario de cita
+     */
+    function guardarCita() {
+      const filaAEditar = document.getElementById('fechaInputCitaModal').dataset.filaEditar;
+      const CitaForm = {
+        numFila: filaAEditar || null, // Si existe, el servidor sabrá que es edición
+        fechaCita: document.getElementById('fechaInputCitaModal')?.value,
+        horaCita: document.getElementById('horaInputCitaModal')?.value,
+        nombreClienteOATC: document.getElementById('clientesDatalistCitaModal')?.value,
+        nombreAgenteOATC: document.getElementById('agentesDisponiblesDatalistCitaModal')?.value,
+        tipoOATC: document.getElementById('tipoOATCDatalistCitaModal')?.value
+      };
+
+      // Validación con SweetAlert2
+      if (!CitaForm.fechaCita || !CitaForm.horaCita || !CitaForm.nombreClienteOATC) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Datos Incompletos',
+          text: 'La fecha, hora y cliente son obligatorios para agendar.',
+          confirmButtonColor: '#f39c12'
+        });
+        return;
+      }
+
+      if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+      google.script.run
+        .withSuccessHandler(onSuccessRegistroCita)
+        .withFailureHandler(err => {
+          if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+          window.onFailureConexion(err);
+        })
+        .registrarCita(CitaForm);
+    }
+
+    // --- MEJORA DE UX DE CLIENTES ---
+    const initClienteCitaInputUX = () => {
+      const inputCliente = document.getElementById('clientesDatalistCitaModal');
+      if (inputCliente) {
+        inputCliente.addEventListener('input', function(e) {
+          const val = e.target.value;
+          if (val.includes(' | DNI:')) {
+            const parts = val.split(' | DNI:');
+            e.target.value = parts[0].trim();
+          }
+        });
+      }
+    };
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initClienteCitaInputUX);
+    } else {
+      initClienteCitaInputUX();
+    }
+
+    // --- EXPOSICIÓN GLOBAL ---
+    window.abrirModalCita = abrirModalCita;
+    window.cerrarModalCita = cerrarModalCita;
+    window.guardarCita = guardarCita;
+    window.editarCita = editarCita;     // <--- IMPORTANTE
+    window.eliminarCita = eliminarCita; // <--- IMPORTANTE
+
+})();
+</script>

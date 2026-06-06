@@ -1,0 +1,248 @@
+<!-- Modal de Historial y Filtro de Datos OATC -->
+<div class="modal fade" id="modalDatosOATC" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content border-0 rounded-4 overflow-hidden shadow-lg">
+      <div class="modal-header text-white border-0 py-3 px-4 d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #4b5563, #1f2937) !important;">
+        <h5 class="modal-title fw-bold text-uppercase fs-5 m-0" style="letter-spacing: 1px;"><i class="fas fa-database me-2 text-warning"></i>Historial y Reporte de Datos OATC</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4" style="background-color: var(--controls-bg); color: var(--controls-text);">
+        
+        <!-- Fila de Filtros Avanzados -->
+        <div class="row g-3 mb-4 p-3 rounded shadow-sm border" style="background-color: var(--controls-bg); border-color: var(--controls-border);">
+          <div class="col-md-2">
+            <label class="form-label fw-bold small text-muted">Fecha Inicio</label>
+            <input type="date" id="filtroFechaInicio" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-bold small text-muted">Fecha Fin</label>
+            <input type="date" id="filtroFechaFin" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold small text-muted">Cliente (DNI o Nombre)</label>
+            <input type="text" id="filtroCliente" class="form-control form-control-sm" placeholder="Buscar cliente...">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-bold small text-muted">Tipo de Demanda</label>
+            <select id="filtroDemanda" class="form-select form-select-sm">
+              <option value="todos">Todos</option>
+              <option value="cliente">Cliente</option>
+              <option value="turno">Turno</option>
+              <option value="promocion">Promoción</option>
+              <option value="correccion">Corrección</option>
+              <option value="turno niño">Turno niño</option>
+              <option value="turno caballero">Turno caballero</option>
+              <option value="producto">Producto</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold small text-muted">Tipo de Atención</label>
+            <select id="filtroAtencion" class="form-select form-select-sm">
+              <option value="todos">Todos</option>
+              <option value="Corte">Corte, corte con diseño</option>
+              <option value="Peinados">Cepillado, planchado, peinados</option>
+              <option value="Color">Color</option>
+              <option value="Alisados">Alisados, laceados y botox</option>
+              <option value="Tratamientos Capilares">Tratamientos Capilares</option>
+              <option value="Manos y pies">Manos y pies</option>
+              <option value="Servicios de cabina">Facial, masajes, etc.</option>
+              <option value="Maquillaje">Maquillaje</option>
+              <option value="Maquillaje y peinado">Maquillaje y peinado</option>
+              <option value="Promocion">Promoción</option>
+              <option value="Producto">Producto</option>
+            </select>
+          </div>
+          
+          <div class="col-md-8">
+            <label class="form-label fw-bold small text-muted">Agente</label>
+            <select id="filtroAgente" class="form-select form-select-sm">
+              <option value="todos">Todos</option>
+            </select>
+          </div>
+          
+          <div class="col-md-4 d-flex align-items-end justify-content-end">
+            <button type="button" class="btn btn-primary w-100 btn-sm fw-bold px-4" onclick="buscarDatosOATCFiltrados()" style="height: 38px;">
+              <i class="fas fa-search me-1"></i> Filtrar y Buscar
+            </button>
+          </div>
+        </div>
+        
+        <!-- Tabla de Reportes -->
+        <div class="rounded-4 p-3 border" style="background-color: var(--controls-bg); border-color: var(--controls-border);">
+          <table id="tablaReporteDatosOATC" class="table table-hover align-middle w-100">
+            <thead>
+              <tr class="table-dark">
+                <th>Fecha</th>
+                <th>Hora</th>
+                <th>Ord.</th>
+                <th>Cliente</th>
+                <th>Celular</th>
+                <th>Demanda</th>
+                <th>Atención</th>
+                <th>Agente</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="bodyReporteDatosOATC"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const btn = document.getElementById("btnDatosOATC");
+  if (btn) {
+    btn.addEventListener("click", abrirModalDatosOATC);
+  }
+});
+
+let DATOS_OATC_HISTORICO = [];
+
+function abrirModalDatosOATC() {
+  const modalEl = document.getElementById('modalDatosOATC');
+  if (!modalEl) return;
+
+  // Fecha de hoy por defecto en los selectores de rango
+  const hoyStr = new Date().toISOString().split('T')[0];
+  document.getElementById('filtroFechaInicio').value = hoyStr;
+  document.getElementById('filtroFechaFin').value = hoyStr;
+  
+  // Limpiar y poblar selector de agentes
+  const selectAgente = document.getElementById('filtroAgente');
+  selectAgente.innerHTML = '<option value="todos">Todos</option>';
+  
+  const datalist = document.getElementById('datalistAgentes');
+  if (datalist) {
+    const options = Array.from(datalist.options).map(o => o.value);
+    // Filtrar duplicados y vacíos
+    const agentesUnicos = [...new Set(options)].filter(Boolean);
+    agentesUnicos.forEach(nombre => {
+      const opt = document.createElement('option');
+      opt.value = nombre;
+      opt.textContent = nombre;
+      selectAgente.appendChild(opt);
+    });
+  }
+
+  const m = bootstrap.Modal.getOrCreateInstance(modalEl);
+  m.show();
+
+  buscarDatosOATCFiltrados();
+}
+
+function buscarDatosOATCFiltrados() {
+  const start = document.getElementById('filtroFechaInicio').value;
+  const end = document.getElementById('filtroFechaFin').value;
+  
+  if (!start || !end) {
+    Swal.fire("Aviso", "Selecciona fecha de inicio y fin.", "warning");
+    return;
+  }
+
+  if (window.mostrarCargando) window.mostrarCargando();
+
+  google.script.run
+    .withSuccessHandler(function(resRaw) {
+      if (window.ocultarCargando) window.ocultarCargando();
+      try {
+        DATOS_OATC_HISTORICO = JSON.parse(resRaw);
+        aplicarFiltrosEnMemoria();
+      } catch (err) {
+        console.error("Error cargando histórico:", err);
+      }
+    })
+    .obtenerHistoricoOATCParaFiltros(start, end);
+}
+
+function aplicarFiltrosEnMemoria() {
+  const queryCliente = document.getElementById('filtroCliente').value.toLowerCase().trim();
+  const selectDemanda = document.getElementById('filtroDemanda').value;
+  const selectAtencion = document.getElementById('filtroAtencion').value;
+  const selectAgente = document.getElementById('filtroAgente').value;
+
+  const filtrados = DATOS_OATC_HISTORICO.filter(o => {
+    // 1. Cliente (DNI o Nombre)
+    if (queryCliente) {
+      const matchCli = String(o.clienteNombre).toLowerCase().includes(queryCliente) || String(o.clienteDni).includes(queryCliente);
+      if (!matchCli) return false;
+    }
+
+    // 2. Demanda
+    if (selectDemanda !== 'todos') {
+      const normaDemanda = String(o.demanda).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      const normaFiltro = selectDemanda.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      if (normaDemanda !== normaFiltro) return false;
+    }
+
+    // 3. Atención
+    if (selectAtencion !== 'todos') {
+      const matchAt = String(o.atencion).toLowerCase().includes(selectAtencion.toLowerCase());
+      if (!matchAt) return false;
+    }
+
+    // 4. Agente
+    if (selectAgente !== 'todos') {
+      if (String(o.agente).toLowerCase().trim() !== selectAgente.toLowerCase().trim()) return false;
+    }
+
+    return true;
+  });
+
+  renderizarTablaReporteOATC(filtrados);
+}
+
+function renderizarTablaReporteOATC(lista) {
+  const tbody = document.getElementById("bodyReporteDatosOATC");
+  if (!tbody) return;
+
+  if ($.fn.DataTable.isDataTable('#tablaReporteDatosOATC')) {
+    $('#tablaReporteDatosOATC').DataTable().destroy();
+  }
+
+  if (lista.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">Ningún registro coincide con los filtros activos.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lista.map(o => {
+    // Badge de estado
+    let badgeEstado = '';
+    if (o.cancelado && o.cancelado.startsWith("Cancelado")) {
+      badgeEstado = `<span class="badge bg-danger">Cancelado</span>`;
+    } else if (o.horaResuelto && o.horaResuelto !== 'Pendiente') {
+      badgeEstado = `<span class="badge bg-success">Resuelto (${o.horaResuelto})</span>`;
+    } else {
+      badgeEstado = `<span class="badge bg-warning text-dark">Pendiente</span>`;
+    }
+
+    // Nombre de la demanda formateado
+    const displayDemanda = String(o.demanda).toUpperCase();
+
+    // Símbolo o correlativo
+    const ordText = o.correlativo ? `${o.correlativo} (${displayDemanda})` : `${o.hora} (${displayDemanda})`;
+
+    return `
+      <tr>
+        <td>${o.fechaTexto}</td>
+        <td>${o.hora}</td>
+        <td class="fw-bold">${ordText}</td>
+        <td>${o.clienteNombre} <br><small class="text-muted">DNI: ${o.clienteDni}</small></td>
+        <td>${o.clienteCelular}</td>
+        <td><span class="badge bg-light text-dark border">${displayDemanda}</span></td>
+        <td>${o.atencion}</td>
+        <td><span class="fw-medium">${o.agente}</span></td>
+        <td>${badgeEstado}</td>
+      </tr>
+    `;
+  }).join("");
+
+  $('#tablaReporteDatosOATC').DataTable({
+    language: { url: 'https://cdn.datatables.net/plug-ins/1.10.25/i18n/Spanish.json' },
+    pageLength: 10,
+    order: [[0, "desc"], [1, "desc"]]
+  });
+}
+</script>

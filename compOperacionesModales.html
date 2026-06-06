@@ -1,0 +1,834 @@
+<!-- 1. Modal para Registrar Cita (modalCita) -->
+<div id="modalCita" class="modal fade" tabindex="-1" aria-labelledby="modalCitaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden; background: #fdfbfb;">
+      <div class="modal-header px-4 py-3 border-0" style="background: linear-gradient(135deg, #111 0%, #17a2b8 100%);">
+        <h5 class="modal-title fs-5 fw-bold text-white d-flex align-items-center" id="modalCitaLabel">
+          <i class="bi bi-calendar-plus-fill me-2 fs-4 text-warning"></i> Registrar Nueva Cita
+        </h5>
+        <button type="button" class="btn-close btn-close-white" onclick="cerrarModalCita()"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label for="fechaInputCitaModal" class="form-label text-muted small fw-semibold">Fecha de Cita</label>
+            <input type="date" id="fechaInputCitaModal" class="form-control border-2 shadow-sm" style="border-radius: 8px;" required>
+          </div>
+          <div class="col-md-6">
+            <label for="horaInputCitaModal" class="form-label text-muted small fw-semibold">🕘 Hora de la Cita</label>
+            <select id="horaInputCitaModal" class="form-select border-2 shadow-sm" style="border-radius: 8px;" required>
+              <option value="" disabled selected>Seleccione una hora</option>
+            </select>
+          </div>
+          
+          <div class="col-12 mt-3">
+            <label for="clientesDatalistCitaModal" class="form-label text-muted small fw-semibold">Cliente</label>
+            <input class="form-control border-2 shadow-sm" list="datalistClientes" id="clientesDatalistCitaModal" style="border-radius: 8px;" placeholder="Escribe para buscar un cliente...">
+          </div>
+          
+          <div class="col-12">
+            <label for="agentesDisponiblesDatalistCitaModal" class="form-label text-muted small fw-semibold">Agente Asignado (Estilista)</label>
+            <input class="form-control border-2 shadow-sm" list="datalistAgentes" id="agentesDisponiblesDatalistCitaModal" style="border-radius: 8px;" placeholder="Escribe para buscar un estilista activo...">
+          </div>
+
+          <div class="col-12">
+            <label for="tipoOATCDatalistCitaModal" class="form-label text-muted small fw-semibold">Tipo de atención / Servicio</label>
+            <input class="form-control border-2 shadow-sm" list="dataListTipoATC" id="tipoOATCDatalistCitaModal" style="border-radius: 8px;" placeholder="Escribe para buscar el servicio...">
+          </div>
+        </div>
+        <div id="statusMessageModalCita" class="mt-3"></div>
+      </div>
+      <div class="modal-footer bg-light border-0 p-3">
+        <button type="button" class="btn btn-outline-secondary px-4 fw-bold shadow-sm" style="border-radius: 30px;" onclick="cerrarModalCita()">Cerrar</button>
+        <button type="button" class="btn btn-info bg-gradient text-white px-4 fw-bold shadow-sm" style="border-radius: 30px;" onclick="guardarCita()">
+          <i class="bi bi-calendar-check me-1"></i> Guardar Cita
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. Modal para Asignar Agente (modalAsignacionAgente) -->
+<div id="modalAsignacionAgente" class="modal fade" tabindex="-1" aria-labelledby="modalAsignacionAgenteLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden; background: #fdfbfb;">
+      <div class="modal-header px-4 py-3 border-0" style="background: linear-gradient(135deg, #111 0%, #17a2b8 100%);">
+        <h5 class="modal-title fs-5 fw-bold text-white d-flex align-items-center" id="modalAsignacionAgenteLabel">
+          <i class="bi bi-person-check-fill me-2 fs-4 text-warning"></i> Asignar Profesional
+        </h5>
+        <button type="button" class="btn-close btn-close-white" onclick="cerrarModalAsignacionAgente()"></button>
+      </div>
+      <div class="modal-body p-4 text-center">
+        <div class="alert bg-info-subtle border-0 shadow-sm text-info-emphasis rounded-3 p-3 mb-4">
+          <p class="mb-1 fw-bold" style="font-size: 0.95rem;">La orden N° <span id="modalAsignacionOATCId" class="badge bg-dark rounded-pill fs-6 px-3"></span> no tiene estilista.</p>
+          <small class="d-block text-muted">Selecciona un profesional para activar e iniciar la atención.</small>
+        </div>
+        
+        <input type="hidden" id="hiddenOatcIdModal">
+
+        <div class="text-start">
+          <label for="agenteAsignadoDatalistModal" class="form-label text-muted small fw-semibold">Profesional Disponible</label>
+          <input class="form-control border-2 shadow-sm" list="datalistAgentesA" id="agenteAsignadoDatalistModal" style="border-radius: 8px;" placeholder="Escribe para buscar un agente activo...">
+        </div>
+
+        <div id="statusMessageModalAsignacion" class="mt-3 text-center"></div>
+      </div>
+      <div class="modal-footer justify-content-center bg-light border-0 p-3">
+        <button type="button" class="btn btn-outline-secondary px-4 fw-bold shadow-sm" style="border-radius: 30px;" onclick="cerrarModalAsignacionAgente()">Cerrar</button>
+        <button type="button" class="btn btn-info bg-gradient text-white px-4 fw-bold shadow-sm" style="border-radius: 30px;" onclick="confirmarAsignacionAgente()">
+          Confirmar y Activar Turno
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. Modal para Justificar Eliminación (modalEliminarOATC) -->
+<div id="modalEliminarOATC" class="modal fade" tabindex="-1" aria-labelledby="modalEliminarOATCLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden; background: #fdfbfb;">
+      <div class="modal-header px-4 py-3 border-0" style="background: linear-gradient(135deg, #111 0%, #dc3545 100%);">
+        <h5 class="modal-title fs-5 fw-bold text-white d-flex align-items-center" id="modalEliminarOATCLabel">
+          <i class="bi bi-trash-fill me-2 fs-4 text-warning"></i> Justificar Eliminación
+        </h5>
+        <button type="button" class="btn-close btn-close-white" onclick="window.cerrarModalEliminarOATC()" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4 text-center">
+        <div class="p-3 bg-danger-subtle text-danger-emphasis rounded-3 border border-danger-subtle mb-4">
+          <i class="bi bi-exclamation-triangle-fill fs-1 text-danger animate__animated animate__pulse animate__infinite"></i>
+          <p class="fw-bold m-0 mt-2 uppercase tracking-wide">⚠️ Acción Irreversible</p>
+          <small class="text-muted d-block mt-1">Vas a eliminar de forma permanente la OATC ID: <strong id="eliminarOATCIdDisplay"></strong></small>
+        </div>
+        
+        <div class="text-start">
+          <label for="justificacionEliminacionInput" class="form-label text-muted small fw-semibold">Motivo o Justificación detallada</label>
+          <textarea class="form-control border-2 shadow-sm" id="justificacionEliminacionInput" rows="3" style="border-radius: 8px;" placeholder="Ej: Error en registro, cancelación, cambio de estilista..." required></textarea>
+        </div>
+        <div id="statusMessageModalEliminar" class="text-danger mt-3 fw-bold text-center small"></div>
+        <input type="hidden" id="hiddenOatcIdEliminar">
+      </div>
+      <div class="modal-footer bg-light border-0 p-3">
+        <button type="button" class="btn btn-outline-secondary px-4 fw-bold shadow-sm" style="border-radius: 30px;" onclick="window.cerrarModalEliminarOATC()">Cancelar</button>
+        <button type="button" class="btn btn-danger bg-gradient px-4 fw-bold shadow-sm" style="border-radius: 30px;" onclick="window.confirmarEliminacionOATC()">
+          Confirmar Eliminación Definitiva
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 4. Modal para Edicion Tipo de Atencion (modalEdicionTipoAtencion) -->
+<div id="modalEdicionTipoAtencion" class="modal fade" tabindex="-1" aria-labelledby="modalEdicionTipoAtencionLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden; background: #fdfbfb;">
+      <div class="modal-header px-4 py-3 border-0" style="background: linear-gradient(135deg, #111 0%, #0d6efd 100%);">
+        <h5 class="modal-title fs-5 fw-bold text-white d-flex align-items-center" id="modalEdicionTipoAtencionTitulo">
+          <i class="bi bi-pencil-square me-2 fs-4 text-warning"></i> Editar Tipo de Atención
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body p-4">
+        <form id="formEdicionTipoAtencion">
+          <div class="mb-3">
+            <label for="oatcIdEnModalTipoAtencion" class="form-label text-muted small fw-semibold">Orden de Atención Seleccionada</label>
+            <input type="text" class="form-control bg-light border-0 shadow-none text-center fs-5 fw-bold py-2" id="oatcIdEnModalTipoAtencion" disabled style="border-radius: 8px; color: #111;">
+          </div>
+          
+          <div class="mb-3">
+            <label for="inputNuevoTipoServicio" class="form-label text-muted small fw-semibold">Nuevo Servicio a Asignar</label>
+            <div class="input-group shadow-sm" style="border-radius: 8px; overflow: hidden;"> 
+              <span class="input-group-text bg-white border-end-0"><i class="bi bi-briefcase text-muted"></i></span>
+              <input type="text" class="form-control border-start-0 py-2 border-2" id="inputNuevoTipoServicio" list="dataListTipoATC" required placeholder="Ej: Corte, Color...">
+            </div>
+          </div>
+        </form>
+
+        <datalist id="dataListTipoATC">
+          <option value="Corte">Corte, corte con diseño</option>
+          <option value="Peinados">Cepillado, planchado, peinados</option>
+          <option value="Color">Color</option>
+          <option value="Alisados, laceados y botox">Alisados, laceados y botox</option>
+          <option value="Tratamientos Capilares">Tratamientos Capilares</option>
+          <option value="Manos y pies">Manos y pies</option>
+          <option value="Servicios de cabina">Facial, masajes, etc.</option>
+          <option value="Maquillaje">Maquillaje</option>
+          <option value="Maquillaje y peinado">Maquillaje y peinado</option>
+          <option value="Promocion">Promoción</option>
+        </datalist>
+
+        <div id="statusMessageEdicionTipo" class="mt-3 text-center p-2 rounded animate__animated animate__fadeIn"></div> 
+      </div>
+
+      <div class="modal-footer border-0 p-3 bg-light">
+        <button type="button" class="btn btn-outline-secondary px-4 fw-bold shadow-sm" style="border-radius: 30px;" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary bg-gradient px-4 fw-bold shadow-sm" style="border-radius: 30px;" onclick="guardarEdicionTipoAtencion()">
+          <i class="bi bi-check-circle-fill me-1"></i> Guardar Cambios
+        </button> 
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 5. Modal para Notas y Montos OATC Resueltas (modalNotasOATC) -->
+<div id="modalNotasOATC" class="modal fade" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;"> 
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden; background: #fdfbfb;">
+      <div class="modal-header bg-gradient text-white py-3 px-4 border-0" style="background: linear-gradient(135deg, #111 0%, #17a2b8 100%);">
+        <h6 class="modal-title fw-bold fs-6 d-flex align-items-center"><i class="bi bi-currency-dollar me-2 fs-5 text-warning"></i>Detalle de la Atención</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <input type="hidden" id="notaOatcId">
+        <div class="mb-3">
+          <label class="form-label text-muted small fw-semibold">MONTO COBRADO (S/.)</label>
+          <div class="input-group shadow-sm" style="border-radius: 8px; overflow: hidden;">
+            <span class="input-group-text bg-white border-end-0 fw-bold text-muted">S/.</span>
+            <input type="number" id="notaMonto" class="form-control border-start-0 border-2 py-2 fs-5 fw-bold text-dark" placeholder="0.00" step="0.01">
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label text-muted small fw-semibold">NOTAS / COMENTARIOS DE ATENCIÓN</label>
+          <textarea id="notaTexto" class="form-control border-2 shadow-sm" rows="3" style="border-radius: 8px;" placeholder="Ej. Tinte marca L'Oreal, clienta feliz..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer bg-light border-0 p-3">
+        <button type="button" class="btn btn-primary bg-gradient w-100 py-2 fw-bold shadow-sm" style="border-radius: 30px;" onclick="guardarNotasServidor()">
+          <i class="bi bi-save me-1"></i> Guardar Detalles
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 6. Modal para Consulta/Gestión de Agentes (modalAgentes) -->
+<div id="modalAgentes" class="modal fade" tabindex="-1" aria-labelledby="modalAgentesLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden; background: #fdfbfb;">
+      <div class="modal-header px-4 py-3 border-0" style="background: linear-gradient(135deg, #111 0%, #198754 100%);">
+        <h5 class="modal-title fs-5 fw-bold text-white d-flex align-items-center" id="modalAgentesLabel">
+          <i class="bi bi-people-fill me-2 fs-4 text-warning"></i> Gestión de Agentes del Salón
+        </h5>
+        <button type="button" class="btn-close btn-close-white" onclick="window.cerrarModalAgentes()"></button>
+      </div>
+      <div class="modal-body p-4 bg-light">
+        <div class="mb-4 d-flex flex-column flex-md-row justify-content-between align-items-center bg-white p-3 rounded-3 shadow-sm border gap-3">
+          <button type="button" class="btn btn-success bg-gradient fw-bold shadow-sm py-2 px-4 d-flex align-items-center gap-2" id="btnAbrirModalNuevoAgente" style="border-radius: 30px;">
+            <i class="bi bi-person-plus-fill fs-5"></i> Agregar Nuevo Agente
+          </button>
+          <button type="button" class="btn btn-outline-secondary fw-bold shadow-sm d-flex align-items-center gap-2 py-2 px-4" onclick="window.cargarAgentesEnModal()" style="border-radius: 30px;">
+            <i class="bi bi-arrow-clockwise fs-5"></i> Recargar Lista
+          </button>
+        </div>
+
+        <div class="table-responsive bg-white rounded-4 shadow-sm p-3 border">
+          <table id="tablaAgentes" class="table table-hover align-middle mb-0 border-0">
+            <thead class="table-light">
+              <tr class="text-uppercase small tracking-wider" style="font-size: 0.75rem;">
+                <th class="ps-3" style="border-top-left-radius: 8px; border-bottom-left-radius: 8px;">ID</th>
+                <th>Nombre Completo</th>
+                <th>DNI/Cédula</th>
+                <th>Apodo</th>
+                <th>Hora Entrada</th>
+                <th>Hora Salida</th>
+                <th>Descanso</th>
+                <th>Especialidad</th>
+                <th>Estado</th>
+                <th class="text-center" style="border-top-right-radius: 8px; border-bottom-right-radius: 8px;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tablaAgentesBody">
+              <!-- Cargado dinámicamente -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer border-0 bg-light p-3">
+        <button type="button" class="btn btn-outline-secondary px-5 fw-bold shadow-sm" style="border-radius: 30px;" onclick="window.cerrarModalAgentes()">Cerrar Módulo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<template id="filaAgenteTemplate">
+  <tr class="shadow-hover transition-all">
+    <td class="agenteID fw-bold text-primary ps-3"></td>
+    <td class="agenteNombre fw-bold text-dark small"></td>
+    <td class="agenteDNI small text-muted"></td>
+    <td class="agenteApodo fst-italic fw-medium small"></td>
+    <td class="agenteIngreso text-success small"></td>
+    <td class="agenteSalida text-danger small"></td>
+    <td class="agenteDiaDesc text-muted small"></td>
+    <td class="agenteEspecialidad"><span class="badge bg-light text-primary border border-primary-subtle rounded-pill px-3"></span></td>
+    <td class="agenteEstado"></td>
+    <td class="agenteAcciones text-center">
+      <div class="d-flex justify-content-center gap-1">
+        <button class="btn btn-sm btn-outline-warning btn-editar-agente" style="border-radius: 6px;"><i class="bi bi-pencil-square"></i></button>
+        <button class="btn btn-sm btn-outline-danger btn-eliminar-agente" style="border-radius: 6px;"><i class="bi bi-trash"></i></button>
+      </div>
+    </td>
+  </tr>
+</template>
+
+<!-- 7. Modal para Registrar/Editar Ficha Agente (modalFormularioAgente) -->
+<div id="modalFormularioAgente" class="modal fade" tabindex="-1" aria-labelledby="modalFormularioAgenteLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered border-primary shadow-lg">
+    <div class="modal-content border-0" style="border-radius: 20px; overflow: hidden; background: #fdfbfb;">
+      <div class="modal-header bg-primary bg-gradient text-white shadow-sm border-0 py-3 px-4">
+        <h5 class="modal-title font-weight-bold fs-5 d-flex align-items-center" id="modalFormularioAgenteLabel">Ficha del Agente</h5> 
+        <button type="button" class="btn-close btn-close-white" onclick="window.cerrarModalFormularioAgente()"></button>
+      </div>
+      <div class="modal-body p-4">
+        <input type="hidden" id="agenteIdOculto">
+        <div id="statusMessageModalAgente" class="alert alert-info border-0 shadow-sm" style="display:none; border-radius: 8px;"></div>
+
+        <form id="formularioAgente" class="needs-validation">
+          <div class="row g-4">
+            <div class="col-md-6 border-end px-4">
+              <div class="mb-3">
+                <label for="nombreCompletoInput" class="form-label text-muted small fw-semibold">Nombre Completo</label>
+                <input type="text" class="form-control border-2 shadow-sm" style="border-radius: 8px;" id="nombreCompletoInput" required>
+              </div>
+              <div class="mb-3">
+                <label for="dniInput" class="form-label text-muted small fw-semibold">DNI / Documento</label>
+                <input type="text" class="form-control border-2 shadow-sm" style="border-radius: 8px;" id="dniInput">
+              </div>
+              <div class="mb-3">
+                <label for="apodoInput" class="form-label text-muted small fw-semibold">Apodo / Nombre Corto</label>
+                <input type="text" class="form-control border-2 shadow-sm" style="border-radius: 8px;" id="apodoInput">
+              </div>
+              <div class="mb-3">
+                <label for="especialidadInput" class="form-label text-muted small fw-semibold">Especialidad</label>
+                <input class="form-control border-2 shadow-sm" list="datalistEspecialidades" id="especialidadInput" style="border-radius: 8px;" placeholder="Seleccionar..." required>
+                <datalist id="datalistEspecialidades">
+                  <option value="Estilismo">
+                  <option value="Colorimetria">
+                  <option value="Cosmiatria">
+                  <option value="Barbería">
+                </datalist>
+              </div>
+            </div>
+
+            <div class="col-md-6 px-4">
+              <div class="mb-3">
+                <label for="estadoInput" class="form-label text-muted small fw-semibold">Estado de Asistencia</label>
+                <select class="form-select border-2 shadow-sm" id="estadoInput" style="border-radius: 8px;" required>
+                  <option value="Activo">🟢 Activo</option>
+                  <option value="Inactivo">🔴 Inactivo</option>
+                  <option value="Permiso">🟡 En Permiso</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label for="ingresoInput" class="form-label text-muted small fw-semibold">Hora de Entrada</label>
+                <input type="time" min="07:00" max="22:00" class="form-control border-2 shadow-sm" style="border-radius: 8px;" id="ingresoInput">
+              </div>
+              <div class="mb-3">
+                <label for="salidaInput" class="form-label text-muted small fw-semibold">Hora de Salida</label>
+                <input type="time" min="07:00" max="22:00" class="form-control border-2 shadow-sm" style="border-radius: 8px;" id="salidaInput">
+              </div>
+              <div class="mb-3">
+                <label for="diaDescInput" class="form-label text-muted small fw-semibold">Día de Descanso</label>
+                <select class="form-select border-2 shadow-sm" id="diaDescInput" style="border-radius: 8px;">
+                  <option value="">-- Seleccionar --</option>
+                  <option value="Domingo">Domingo</option>
+                  <option value="Lunes">Lunes</option>
+                  <option value="Martes">Martes</option>
+                  <option value="Miércoles">Miércoles</option>
+                  <option value="Jueves">Jueves</option>
+                  <option value="Viernes">Viernes</option>
+                  <option value="Sábado">Sábado</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer bg-light p-3 border-0">
+        <button type="button" class="btn btn-outline-secondary px-4 fw-bold shadow-sm" style="border-radius: 30px;" onclick="window.cerrarModalFormularioAgente()">Cancelar</button>
+        <button type="button" class="btn btn-primary bg-gradient px-5 fw-bold shadow border-0" style="border-radius: 30px;" id="btnGuardarAgente" onclick="window.guardarAgente()">
+          <i class="bi bi-person-check-fill me-1"></i> Guardar Ficha Agente
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 8. Modal para Citas Programadas (modalListadoCitas) -->
+<div id="modalListadoCitas" class="modal fade" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden; background: #fdfbfb;">
+      <div class="modal-header px-4 py-3 border-0" style="background: linear-gradient(135deg, #111 0%, #ffc107 100%);">
+        <h5 class="modal-title fs-5 fw-bold text-dark d-flex align-items-center">
+          <i class="bi bi-calendar-check-fill me-2 fs-4"></i> Citas Programadas (Hoy en Adelante)
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4 bg-light">
+        <div class="table-responsive bg-white rounded-4 p-3 border shadow-sm">
+          <table class="table table-hover align-middle mb-0" id="tablaGestionCitas">
+            <thead class="table-light">
+              <tr class="text-uppercase small tracking-wider" style="font-size: 0.75rem;">
+                <th class="ps-3" style="border-top-left-radius: 8px; border-bottom-left-radius: 8px;">Fecha/Hora</th>
+                <th>Cliente</th>
+                <th>Servicio</th>
+                <th>Agente</th>
+                <th class="text-center" style="border-top-right-radius: 8px; border-bottom-right-radius: 8px;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="bodyGestionCitas">
+              <!-- Cargado dinámicamente -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 9. Modal para Registrar Venta a Caja (modalVentaCaja) -->
+<div id="modalVentaCaja" class="modal fade" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden; background: #fdfbfb;">
+      <div class="modal-header px-4 py-3 border-0" style="background: linear-gradient(135deg, #111 0%, #198754 100%);">
+        <h5 class="modal-title fs-5 fw-bold text-white d-flex align-items-center">
+          <i class="bi bi-cart-fill me-2 fs-4 text-warning"></i> Enviar Venta de Productos a Caja
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4 bg-light" style="position: relative; min-height: 400px;">
+        
+        <div id="infoClienteCaja" class="alert alert-secondary border-0 shadow-sm mb-4 rounded-3 p-3 text-dark fw-bold"></div>
+
+        <div class="mb-4" style="position: relative;">
+          <label class="form-label text-muted small fw-semibold">BUSCAR PRODUCTO O SERVICIO AÑADIDO:</label>
+          <div class="input-group shadow-sm" style="border-radius: 8px; overflow: hidden;">
+            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-success"></i></span>
+            <input type="text" id="buscarProductoCaja" class="form-control border-start-0 py-2 border-2" placeholder="Escribe para buscar..." autocomplete="off">
+          </div>
+          <div id="listaBusquedaProductos" class="list-group shadow-lg border border-2 mt-1 rounded-3 overflow-hidden" style="position: absolute; width: 100%; z-index: 9999; top: 100%; background: white; max-height: 250px; overflow-y: auto;">
+          </div>
+        </div>
+
+        <div class="table-responsive bg-white rounded-4 border p-2 mt-4 shadow-sm">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr class="text-uppercase small tracking-wider" style="font-size: 0.72rem;">
+                <th class="ps-3" style="border-top-left-radius: 8px; border-bottom-left-radius: 8px;">Producto</th>
+                <th width="120">Precio</th>
+                <th width="100" class="text-center" style="border-top-right-radius: 8px; border-bottom-right-radius: 8px;">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="contenedorCarrito"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer bg-light border-0 p-3">
+        <button type="button" class="btn btn-outline-secondary px-4 fw-bold shadow-sm" style="border-radius: 30px;" data-bs-dismiss="modal">CANCELAR</button>
+        <button id="btnFinalizarVenta" class="btn btn-success bg-gradient px-4 fw-bold shadow-sm" style="border-radius: 30px;">
+          <i class="bi bi-send me-1"></i> ENVIAR A CAJA
+        </button>
+      </div>
+    </div>
+  </div>
+<!-- Modal de Historial y Filtro de Datos OATC -->
+<div class="modal fade" id="modalDatosOATC" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content border-0 rounded-4 overflow-hidden shadow-lg">
+      <div class="modal-header text-white border-0 py-3 px-4 d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #4b5563, #1f2937) !important;">
+        <h5 class="modal-title fw-bold text-uppercase fs-5 m-0" style="letter-spacing: 1px;"><i class="fas fa-database me-2 text-warning"></i>Historial y Reporte de Datos OATC</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4" style="background-color: var(--controls-bg); color: var(--controls-text);">
+        
+        <!-- Fila de Filtros Avanzados -->
+        <div class="row g-3 mb-4 p-3 rounded shadow-sm border" style="background-color: var(--controls-bg); border-color: var(--controls-border);">
+          <div class="col-md-2">
+            <label class="form-label fw-bold small text-muted">Fecha Inicio</label>
+            <input type="date" id="filtroFechaInicio" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-bold small text-muted">Fecha Fin</label>
+            <input type="date" id="filtroFechaFin" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold small text-muted">Cliente (DNI o Nombre)</label>
+            <input type="text" id="filtroCliente" class="form-control form-control-sm" placeholder="Buscar cliente...">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-bold small text-muted">Tipo de Demanda</label>
+            <select id="filtroDemanda" class="form-select form-select-sm">
+              <option value="todos">Todos</option>
+              <option value="cliente">Cliente</option>
+              <option value="turno">Turno</option>
+              <option value="promocion">Promoción</option>
+              <option value="correccion">Corrección</option>
+              <option value="turno niño">Turno niño</option>
+              <option value="turno caballero">Turno caballero</option>
+              <option value="producto">Producto</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold small text-muted">Tipo de Atención</label>
+            <select id="filtroAtencion" class="form-select form-select-sm">
+              <option value="todos">Todos</option>
+              <option value="Corte">Corte, corte con diseño</option>
+              <option value="Peinados">Cepillado, planchado, peinados</option>
+              <option value="Color">Color</option>
+              <option value="Alisados">Alisados, laceados y botox</option>
+              <option value="Tratamientos Capilares">Tratamientos Capilares</option>
+              <option value="Manos y pies">Manos y pies</option>
+              <option value="Servicios de cabina">Facial, masajes, etc.</option>
+              <option value="Maquillaje">Maquillaje</option>
+              <option value="Maquillaje y peinado">Maquillaje y peinado</option>
+              <option value="Promocion">Promoción</option>
+              <option value="Producto">Producto</option>
+            </select>
+          </div>
+          
+          <div class="col-md-8">
+            <label class="form-label fw-bold small text-muted">Agente</label>
+            <select id="filtroAgente" class="form-select form-select-sm">
+              <option value="todos">Todos</option>
+            </select>
+          </div>
+          
+          <div class="col-md-4 d-flex align-items-end justify-content-end">
+            <button type="button" class="btn btn-primary w-100 btn-sm fw-bold px-4" onclick="buscarDatosOATCFiltrados()" style="height: 38px;">
+              <i class="fas fa-search me-1"></i> Filtrar y Buscar
+            </button>
+          </div>
+        </div>
+        
+        <!-- Tabla de Reportes -->
+        <div class="rounded-4 p-3 border" style="background-color: var(--controls-bg); border-color: var(--controls-border);">
+          <table id="tablaReporteDatosOATC" class="table table-hover align-middle w-100">
+            <thead>
+              <tr class="table-dark">
+                <th>Fecha</th>
+                <th>Hora</th>
+                <th>Ord.</th>
+                <th>Cliente</th>
+                <th>Celular</th>
+                <th>Demanda</th>
+                <th>Atención</th>
+                <th>Agente</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="bodyReporteDatosOATC"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/**
+ * --- GESTIÓN DE ASIGNACIÓN DE AGENTE ---
+ */
+(function() {
+
+  let asignacionAgenteModal; 
+  window.currentOatcIdToAssign = ''; 
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const modalElement = document.getElementById('modalAsignacionAgente');
+    if (modalElement) {
+      asignacionAgenteModal = new bootstrap.Modal(modalElement);
+    }
+  });
+
+  function abrirModalAsignacionAgente(oatcId) {
+    if (!oatcId) return;
+
+    window.currentOatcIdToAssign = oatcId; 
+    
+    const labelId = document.getElementById('modalAsignacionOATCId');
+    const inputHidden = document.getElementById('hiddenOatcIdModal');
+    const inputAgente = document.getElementById('agenteAsignadoDatalistModal');
+
+    if (labelId) labelId.textContent = oatcId;
+    if (inputHidden) inputHidden.value = oatcId;
+    if (inputAgente) inputAgente.value = '';
+
+    if (typeof window.loadInfoDataListAgentesActivos === 'function') {
+      window.loadInfoDataListAgentesActivos(); 
+    }
+
+    if (asignacionAgenteModal) asignacionAgenteModal.show();
+  }
+
+  function cerrarModalAsignacionAgente() {
+    if (asignacionAgenteModal) asignacionAgenteModal.hide();
+    const statusMsg = document.getElementById('statusMessageModalAsignacion');
+    if (statusMsg) statusMsg.textContent = '';
+  }
+
+  function confirmarAsignacionAgente() {
+    const inputAgente = document.getElementById('agenteAsignadoDatalistModal');
+    const nuevoAgenteAsignado = inputAgente ? inputAgente.value.trim() : '';
+
+    if (!nuevoAgenteAsignado) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Asignación requerida',
+        text: 'Por favor, selecciona un agente de la lista para continuar.',
+        confirmButtonColor: '#3085d6'
+      });
+      return;
+    }
+
+    if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+    google.script.run
+      .withSuccessHandler(onSuccessAsignacion)
+      .withFailureHandler(function(error) {
+        if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+        if (typeof window.onFailureConexion === 'function') {
+          window.onFailureConexion(error);
+        }
+      })
+      .asignarAgenteYActivar(window.currentOatcIdToAssign, nuevoAgenteAsignado);
+  }
+
+  function onSuccessAsignacion(respuesta) {
+    if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+    
+    cerrarModalAsignacionAgente();
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Agente Asignado',
+      text: `La OATC ${window.currentOatcIdToAssign} ahora está activa.`,
+      timer: 2000,
+      showConfirmButton: false
+    });
+
+    if (typeof window.generarNuevoIdOATC === 'function') {
+      window.generarNuevoIdOATC(); 
+    }
+
+    if (typeof window.actualizarVistasPostAccion === 'function') {
+      window.actualizarVistasPostAccion(respuesta);
+    }
+  }
+
+  window.abrirModalAsignacionAgente = abrirModalAsignacionAgente;
+  window.cerrarModalAsignacionAgente = cerrarModalAsignacionAgente;
+  window.confirmarAsignacionAgente = confirmarAsignacionAgente;
+
+})(); 
+</script>
+
+<script>
+/**
+ * --- GESTIÓN DE ELIMINAR OATC ---
+ */
+(function() {
+
+  window.currentOatcIdToEliminate = '';
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const modalElement = document.getElementById('modalEliminarOATC');
+    if (modalElement) {
+      eliminarOATCModal = new bootstrap.Modal(modalElement);
+    }
+  });
+
+  function abrirModalEliminarOATC(oatcId) {
+    if (!oatcId) return;
+
+    window.currentOatcIdToEliminate = oatcId;
+    
+    const displayId = document.getElementById('eliminarOATCIdDisplay');
+    const inputHidden = document.getElementById('hiddenOatcIdEliminar');
+    const inputJustificacion = document.getElementById('justificacionEliminacionInput');
+
+    if (displayId) displayId.textContent = `ID ${oatcId}`;
+    if (inputHidden) inputHidden.value = oatcId;
+    if (inputJustificacion) inputJustificacion.value = ''; 
+
+    const modalElement = document.getElementById('modalEliminarOATC');
+    if (modalElement) {
+      const modalInstance = bootstrap.Modal.getOrCreateInstance(modalElement);
+      modalInstance.show();
+    }
+  }
+
+  function cerrarModalEliminarOATC() {
+    const modalElement = document.getElementById('modalEliminarOATC');
+    if (modalElement) {
+      const modalInstance = bootstrap.Modal.getInstance(modalElement);
+      if (modalInstance) modalInstance.hide();
+    }
+  }
+  
+  function onSuccessEliminacion(respuesta) {
+    if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+    
+    cerrarModalEliminarOATC();
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Registro Eliminado',
+      text: respuesta || 'La orden ha sido removida correctamente.',
+      timer: 1500,
+      showConfirmButton: false
+    });
+
+    if (window.actualizarVistasPostAccion) {
+      window.actualizarVistasPostAccion(null, true);
+    }
+  }
+
+  function confirmarEliminacionOATC() {
+    const oatcId = window.currentOatcIdToEliminate;
+    const justificacionInput = document.getElementById('justificacionEliminacionInput');
+    const justificacion = justificacionInput ? justificacionInput.value.trim() : '';
+
+    if (!justificacion || justificacion.length < 5) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Justificación Requerida',
+        text: 'Por favor, ingrese un motivo válido (mínimo 5 caracteres) para eliminar esta orden.',
+        confirmButtonColor: '#d33'
+      });
+      return;
+    }
+
+    Swal.fire({
+      title: "¿Estás completamente seguro?",
+      text: `Vas a eliminar la OATC ${oatcId}. Esta acción quedará registrada en el historial.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar definitivamente',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+        google.script.run
+          .withSuccessHandler(onSuccessEliminacion)
+          .withFailureHandler(err => {
+            if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+            window.onFailureConexion(err);
+          })
+          .eliminarOATC(oatcId, justificacion); 
+      }
+    });
+  }
+
+  window.abrirModalEliminarOATC = abrirModalEliminarOATC;
+  window.cerrarModalEliminarOATC = cerrarModalEliminarOATC;
+  window.confirmarEliminacionOATC = confirmarEliminacionOATC;
+  
+})();
+</script>
+
+<script>
+/**
+ * --- GESTIÓN DE EDICIÓN DE TIPO DE ATENCIÓN ---
+ */
+(function() {
+
+  let currentOatcIdToEditTipoAtencion = null; 
+
+  function abrirModalEdicionTipoAtencion(oatcId) {
+    if (!oatcId) {
+        Swal.fire('Error', 'No se identificó la orden.', 'error');
+        return;
+    }
+
+    currentOatcIdToEditTipoAtencion = oatcId; 
+    
+    const tituloModal = document.getElementById('modalEdicionTipoAtencionTitulo');
+    const inputOATCId = document.getElementById('oatcIdEnModalTipoAtencion');
+    
+    if (tituloModal) tituloModal.textContent = `Cargando OATC #${oatcId}...`;
+    if (inputOATCId) inputOATCId.value = oatcId; 
+
+    if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+    google.script.run
+        .withFailureHandler(function(error) {
+            if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+            if (window.onFailureConexion) window.onFailureConexion(error);
+        })
+        .withSuccessHandler(showModalWithTipoAtencionData) 
+        .obtenerDatosOATCparaEdicionServicio(oatcId);
+  }
+
+  function showModalWithTipoAtencionData(datosOATC) {
+    if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+
+    const modalElement = document.getElementById('modalEdicionTipoAtencion');
+    const inputServicio = document.getElementById('inputNuevoTipoServicio'); 
+    const tituloModal = document.getElementById('modalEdicionTipoAtencionTitulo');
+    
+    if (!modalElement || !inputServicio) {
+        Swal.fire('Error de Interfaz', 'Componentes críticos no encontrados.', 'error');
+        return;
+    }
+
+    if (!datosOATC) {
+        Swal.fire('Sin Datos', 'No se encontró información.', 'warning');
+        return;
+    }
+
+    inputServicio.value = datosOATC.tipoServicio || ''; 
+    
+    if (tituloModal) {
+        tituloModal.textContent = `Actualizar Servicio - OATC #${currentOatcIdToEditTipoAtencion}`;
+    }
+
+    try {
+        let modalInstance = bootstrap.Modal.getInstance(modalElement);
+        if (!modalInstance) {
+            modalInstance = new bootstrap.Modal(modalElement);
+        }
+        modalInstance.show();
+        setTimeout(() => inputServicio.focus(), 500);
+    } catch (err) {
+        console.error("[ERROR]: Bootstrap Modal Error:", err);
+    }
+  }
+
+  function guardarEdicionTipoAtencion() {
+    const idOATC = currentOatcIdToEditTipoAtencion;
+    const inputServicio = document.getElementById('inputNuevoTipoServicio');
+    if (!inputServicio || !idOATC) return;
+
+    const nuevoTipo = inputServicio.value.trim();
+    if (!nuevoTipo) {
+        Swal.fire('Atención', 'El campo no puede estar vacío.', 'warning');
+        return;
+    }
+    
+    if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+    google.script.run
+        .withSuccessHandler(function(res) {
+            if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+            Swal.fire({ icon: 'success', title: 'Actualizado', timer: 2000, showConfirmButton: false });
+
+            const modalEl = document.getElementById('modalEdicionTipoAtencion');
+            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+            if (modalInstance) modalInstance.hide();
+
+            if (typeof window.filtrarViewTodas === 'function') window.filtrarViewTodas();
+        })
+        .withFailureHandler(function(error) {
+            if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+            if (window.onFailureConexion) window.onFailureConexion(error);
+        })
+        .actualizarTipoAtencionOATC(idOATC, nuevoTipo); 
+  }
+
+  window.abrirModalEdicionTipoAtencion = abrirModalEdicionTipoAtencion;
+  window.guardarEdicionTipoAtencion = guardarEdicionTipoAtencion;
+
+})();
+</script>

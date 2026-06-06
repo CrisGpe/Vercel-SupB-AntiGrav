@@ -1,0 +1,100 @@
+<script>
+  
+  let clienteModal; 
+
+  document.addEventListener('DOMContentLoaded', (event) => {
+    const modalElement = document.getElementById('modalCliente');
+    if (modalElement) {
+      clienteModal = new bootstrap.Modal(modalElement); 
+    }
+  });
+
+  function abrirModalCliente() {
+      if (clienteModal) clienteModal.show(); 
+  }
+
+  function cerrarModalCliente() {
+    if (clienteModal) clienteModal.hide(); 
+    
+    const campos = [
+      'nombreClienteModal', 'apellidoClienteModal', 'dniClienteModal', 
+      'cumpleanosClienteModal', 'celularClienteModal', 'correoClienteModal'
+    ];
+    campos.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+
+    const statusElement = document.getElementById('statusMessageModal');
+    if (statusElement) statusElement.textContent = '';
+  }
+
+  // >>>>>> INICIO: Manejadores de éxito y fracaso para el registro de cliente <<<<<<
+
+  function onSuccessRegistroCliente(respuestaServidor) {
+    console.log("DEBUG(Cliente/ModalCliente): Registro exitoso.");
+    
+    // 1. Cerramos y limpiamos el modal inmediatamente
+    cerrarModalCliente(); 
+
+    // 2. Usamos el sistema centralizado de actualización
+    // Esto recargará los datalists (clientes y agentes) y las tablas
+    if (window.actualizarVistasPostAccion) {
+        window.actualizarVistasPostAccion(respuestaServidor, false);
+    } else {
+        // Fallback en caso de que la función global no esté disponible
+        if (typeof loadInfoDataListClientes === 'function') loadInfoDataListClientes();
+        Swal.fire({ icon: 'success', title: '¡Listo!', text: respuestaServidor, timer: 1500 });
+    }
+  }
+
+  // Reutilizamos la función genérica de manejo de errores de conexión.
+  // ... (onFailureConexion function follows...) ...
+
+  function onFailureConexion(error) {
+    console.error("Error de Apps Script:", error.message, error);
+
+    const statusElement = document.getElementById('statusMessageModal');
+    if (error.message && error.message.includes("ERR_CONNECTION_CLOSED")) {
+      const msg = "⚠️ Error de Conexión. La conexión con el servidor de Google falló temporalmente. Por favor, inténtalo de nuevo.";
+      if (statusElement) statusElement.textContent = msg;
+      else alert(msg);
+    } else {
+      const msg = "❌ Error del Servidor: " + error.message + ". Contacta a soporte si persiste.";
+      if (statusElement) statusElement.textContent = msg;
+      else alert(msg);
+    }
+  }
+  
+  // >>>>>> FIN: Manejadores <<<<<<
+
+  // Función para manejar el guardado de datos
+  function guardarCliente() {
+    const nombre = document.getElementById('nombreClienteModal').value.trim();
+    const apellido = document.getElementById('apellidoClienteModal').value.trim();
+    const dni = document.getElementById('dniClienteModal').value.trim();
+    const cumpleanos = document.getElementById('cumpleanosClienteModal').value; 
+    const celular = document.getElementById('celularClienteModal').value.trim();
+    const correo = document.getElementById('correoClienteModal').value.trim();
+    
+    const statusElement = document.getElementById('statusMessageModal');
+    
+    // Validación básica
+    if (!nombre || !apellido) {
+      if (statusElement) statusElement.textContent = 'Nombre y apellido son obligatorios.';
+      Swal.fire('Atención', 'Nombre y apellido son requeridos.', 'warning');
+      return;
+    }
+    
+    const datosCliente = { nombre, apellido, dni, cumpleanos, celular, correo };
+    
+    // Mostramos feedback visual de carga
+    if (window.mostrarSpinner) window.mostrarSpinner();
+    
+    google.script.run
+      .withSuccessHandler(onSuccessRegistroCliente)
+      .withFailureHandler(window.onFailureConexion || ((err) => Swal.fire('Error', err.message, 'error')))      
+      .registrarClienteEnHoja(datosCliente); 
+  }
+
+</script>

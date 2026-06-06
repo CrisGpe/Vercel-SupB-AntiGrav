@@ -1,0 +1,136 @@
+<script>
+/**
+ * --- GESTIÓN DE MODAL: EDICIÓN DE TIPO DE ATENCIÓN (VERSIÓN EXTENDIDA) ---
+ * Este módulo se encarga de la actualización del servicio o tipo de atención 
+ * vinculado a una orden (OATC), con soporte para feedback visual en tiempo real.
+ */
+(function() {
+
+  // Variable global de ámbito privado para el ID de la OATC en edición
+  let currentOatcIdToEditTipoAtencion = null; 
+
+  /**
+    * Inicia el proceso de edición solicitando datos al servidor.
+    * @param {string} oatcId - El identificador único de la orden.
+    */
+  function abrirModalEdicionTipoAtencion(oatcId) {
+    if (!oatcId) {
+        console.error("[ERROR]: ID de OATC ausente.");
+        Swal.fire('Error', 'No se identificó la orden.', 'error');
+        return;
+    }
+
+    currentOatcIdToEditTipoAtencion = oatcId; 
+    
+    const tituloModal = document.getElementById('modalEdicionTipoAtencionTitulo');
+    const inputOATCId = document.getElementById('oatcIdEnModalTipoAtencion');
+    
+    if (tituloModal) tituloModal.textContent = `Cargando OATC #${oatcId}...`;
+    if (inputOATCId) inputOATCId.value = oatcId; 
+
+    if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+    // Llamada al servidor
+    google.script.run
+        .withFailureHandler(function(error) {
+            if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+            if (window.onFailureConexion) window.onFailureConexion(error);
+        })
+        .withSuccessHandler(showModalWithTipoAtencionData) // IMPORTANTE: Debe ser visible globalmente
+        .obtenerDatosOATCparaEdicionServicio(oatcId);
+  }
+
+  /**
+    * Procesa la respuesta exitosa del servidor y despliega la interfaz de usuario.
+    * @param {Object} datosOATC - Estructura de datos que contiene el tipo de servicio actual.
+    */
+  function showModalWithTipoAtencionData(datosOATC) {
+    if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+
+    const modalElement = document.getElementById('modalEdicionTipoAtencion');
+    const inputServicio = document.getElementById('inputNuevoTipoServicio'); 
+    // BUSCAMOS EL TÍTULO POR EL ID EXACTO DEL NUEVO modales.html
+    const tituloModal = document.getElementById('modalEdicionTipoAtencionTitulo');
+    
+    // LOG DE DEPURACIÓN PARA LA CONSOLA (Como el de tu captura)
+    console.log("[DEBUG]: Verificando elementos:", {
+        modal: !!modalElement,
+        input: !!inputServicio,
+        titulo: !!tituloModal
+    });
+
+    // VALIDACIÓN FLEXIBLE: Si falta el título, no bloqueamos toda la aplicación
+    if (!modalElement || !inputServicio) {
+        Swal.fire('Error de Interfaz', 'Componentes críticos no encontrados.', 'error');
+        return;
+    }
+
+    if (!datosOATC) {
+        Swal.fire('Sin Datos', 'No se encontró información.', 'warning');
+        return;
+    }
+
+    // CARGA DE DATOS
+    inputServicio.value = datosOATC.tipoServicio || ''; 
+    
+    // ACTUALIZACIÓN SEGURA DEL TÍTULO
+    if (tituloModal) {
+        tituloModal.textContent = `Actualizar Servicio - OATC #${currentOatcIdToEditTipoAtencion}`;
+    }
+
+    // MOSTRAR MODAL
+    try {
+        let modalInstance = bootstrap.Modal.getInstance(modalElement);
+        if (!modalInstance) {
+            modalInstance = new bootstrap.Modal(modalElement);
+        }
+        modalInstance.show();
+        
+        setTimeout(() => inputServicio.focus(), 500);
+    } catch (err) {
+        console.error("[ERROR]: Bootstrap Modal Error:", err);
+    }
+  }
+
+  /**
+    * Valida y persiste los cambios del Tipo de Atención en la base de datos.
+    */
+  function guardarEdicionTipoAtencion() {
+    const idOATC = currentOatcIdToEditTipoAtencion;
+    const inputServicio = document.getElementById('inputNuevoTipoServicio');
+    if (!inputServicio || !idOATC) return;
+
+    const nuevoTipo = inputServicio.value.trim();
+    if (!nuevoTipo) {
+        Swal.fire('Atención', 'El campo no puede estar vacío.', 'warning');
+        return;
+    }
+    
+    if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+    google.script.run
+        .withSuccessHandler(function(res) {
+            if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+            Swal.fire({ icon: 'success', title: 'Actualizado', timer: 2000, showConfirmButton: false });
+
+            // Cerrar modal de forma segura
+            const modalEl = document.getElementById('modalEdicionTipoAtencion');
+            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+            if (modalInstance) modalInstance.hide();
+
+            if (typeof window.filtrarViewTodas === 'function') window.filtrarViewTodas();
+        })
+        .withFailureHandler(function(error) {
+            if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+            if (window.onFailureConexion) window.onFailureConexion(error);
+        })
+        .actualizarTipoAtencionOATC(idOATC, nuevoTipo); 
+  }
+
+  // --- EXPOSICIÓN GLOBAL DE FUNCIONES ---
+  // Registramos las funciones en el objeto window para que sean invocables desde el HTML
+  window.abrirModalEdicionTipoAtencion = abrirModalEdicionTipoAtencion;
+  window.guardarEdicionTipoAtencion = guardarEdicionTipoAtencion;
+
+})();
+</script>

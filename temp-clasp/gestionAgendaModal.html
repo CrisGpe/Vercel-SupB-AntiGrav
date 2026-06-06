@@ -1,0 +1,661 @@
+<script>
+/**
+ * GESTIÓN DE AGENDA Y CALENDARIO - VERSIÓN SIN WHATSAPP
+ */
+let calendar; 
+
+// 1. FUNCIONES DE APERTURA Y CARGA
+window.mostrarAgendaDelMesEnModal = function() {
+  const modalEl = document.getElementById('agendaModal');
+  if (!modalEl) return;
+  
+  // Registrar el listener antes de mostrar para asegurar que Bootstrap lo dispare
+  modalEl.removeEventListener('shown.bs.modal', ejecutarCargaAgenda);
+  modalEl.addEventListener('shown.bs.modal', ejecutarCargaAgenda);
+  
+  const instancia = bootstrap.Modal.getOrCreateInstance(modalEl);
+  instancia.show();
+};
+
+function ejecutarCargaAgenda() {
+  console.log("DEBUG: Modal abierto, cargando datos unificados...");
+  cargarDatosDesdeGoogleSheets();
+  inicializarCalendario();
+}
+
+// 2. INICIALIZACIÓN DE FULLCALENDAR
+function inicializarCalendario() {
+  const calendarEl = document.getElementById('calendar');
+  if (!calendarEl) return;
+
+  if (calendar) {
+    calendar.updateSize();
+    calendar.refetchEvents();
+    return;
+  }
+
+  calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    locale: 'es',
+    height: 500,
+    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
+    eventClick: function(info) {
+      var ev = info.event;
+      var props = ev.extendedProps;
+
+      if (props.tipo === 'CitaAgrupada') {
+        mostrarDetalleCitas(props.detalles, ev.startStr);
+      } 
+      else if (props.tipo === 'Cumpleaños' && !ev.id.includes("AGENTE")) {
+        var nombreCliente = ev.title.replace('🎂 Cumpleaños: ', '').replace('Cliente: ', '');
+        var tel = props.telefono || "";
+        
+        var mensaje = encodeURIComponent('¡Hola ' + nombreCliente + '! ✨ De parte de todo el equipo de GLOSS, te deseamos un muy feliz cumpleaños. Que pases un día increíble. 🎂🎉');
+        var urlWa = 'https://wa.me/' + tel + '?text=' + mensaje;
+
+        // Usamos concatenación estándar para evitar el error de "Unexpected token"
+        var htmlContenido = '<div class="text-center">' +
+                            '<p>🎁 <strong>' + nombreCliente + '</strong> está de cumpleaños hoy.</p>';
+        
+        if (tel) {
+          htmlContenido += '<a href="' + urlWa + '" target="_blank" class="btn btn-success mt-3">' +
+                           '<i class="fab fa-whatsapp"></i> Enviar Saludo por WhatsApp' +
+                           '</a>';
+        } else {
+          htmlContenido += '<p class="text-muted small"><i>No hay teléfono registrado para este cliente</i></p>';
+        }
+        
+        htmlContenido += '</div>';
+
+        Swal.fire({
+          title: '¡Es su cumpleaños!',
+          html: htmlContenido,
+          showConfirmButton: false,
+          showCloseButton: true
+        });
+      } 
+      else {
+        Swal.fire({
+          title: 'Detalle del Evento',
+          text: ev.title,
+          icon: 'info',
+          confirmButtonColor: ev.backgroundColor || '#3085d6'
+        });
+      }
+    },
+    events: function(fetchInfo, successCallback) {
+      console.log("CALENDARIO: Solicitando datos al servidor...");
+
+      google.script.run.withSuccessHandler(function(resRaw) {
+        try {
+          const res = JSON.parse(resRaw);
+          const eventosAgenda = res.eventosAgenda || [];
+          const cumples = res.cumples || [];
+          const cumplesStaff = res.cumplesStaff || [];
+          const citas = res.citas || [];
+
+          const listaBase = eventosAgenda
+            .concat(cumples)
+            .concat(cumplesStaff)
+            .map(ev => {
+              if (!ev || !ev.fecha) return null;
+              const fechaFinal = transformarFechaParaCalendario(ev.fecha);
+              if (!fechaFinal) return null;
+              
+              let bgColor = '#f39c12'; // default color
+              if (ev.tipo === 'Ausencia') {
+                bgColor = '#e74c3c'; // Rojo para ausencias
+              } else if (ev.id && ev.id.includes("AGENTE")) {
+                bgColor = '#9b59b6'; // Morado para cumples staff
+              }
+              
+              return {
+                id: ev.id,
+                title: ev.descripcion,
+                start: fechaFinal,
+                backgroundColor: bgColor,
+                extendedProps: { 
+                  tipo: ev.tipo, 
+                  telefono: ev.telefono 
+                }
+              };
+            })
+            .filter(Boolean);
+
+          const citasAgrupadas = {};
+          citas.forEach(c => {
+            if (!c || !c.fecha) return;
+            const fechaIso = transformarFechaParaCalendario(c.fecha);
+            if (!fechaIso) return;
+            if (!citasAgrupadas[fechaIso]) citasAgrupadas[fechaIso] = [];
+            citasAgrupadas[fechaIso].push(c);
+          });
+
+          const eventosCitas = Object.keys(citasAgrupadas).map(fechaIso => ({
+            title: `📅 ${citasAgrupadas[fechaIso].length} Citas`,
+            start: fechaIso,
+            backgroundColor: '#28a745',
+            extendedProps: { tipo: 'CitaAgrupada', detalles: citasAgrupadas[fechaIso] }
+          }));
+
+          successCallback(listaBase.concat(eventosCitas));
+        } catch (e) {
+          console.error("Error al parsear eventos de calendario:", e);
+          successCallback([]);
+        }
+      }).obtenerDatosAgendaCompletos();
+    }
+  });
+  calendar.render();
+}
+
+// 3. CARGA DE TABLA DESDE GOOGLE SHEETS CON PAGINACIÓN PREMIUM
+window.AGENDA_ITEMS_ALL = [];
+window.AGENDA_ITEMS_FILTERED = [];
+window.AGENDA_CURRENT_PAGE = 1;
+
+function cargarDatosDesdeGoogleSheets() {
+  const tbody = document.getElementById('bodyTablaAgenda');
+  const template = document.getElementById('plantillaFilaAgenda');
+  if (!tbody || !template) return;
+
+  tbody.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-dark"></div><div class="small mt-2 text-muted fw-semibold">Cargando eventos...</div></div>';
+
+  google.script.run.withSuccessHandler(function(resRaw) {
+    try {
+      const res = JSON.parse(resRaw);
+      const notas = res.eventosAgenda || [];
+      const cumples = res.cumples || [];
+      const cumplesStaff = res.cumplesStaff || [];
+      const citas = res.citas || [];
+
+      const citasAdaptadas = citas.map(c => {
+        let fechaStr = "01/01/2026";
+        if (c.fecha) {
+          if (c.fecha.includes('-')) {
+            fechaStr = c.fecha.split('-').reverse().join('/');
+          } else {
+            fechaStr = String(c.fecha);
+          }
+        }
+        return {
+          fecha: fechaStr,
+          descripcion: `CITA: ${c.cliente} - ${c.servicio} (${c.hora})`,
+          estado: 'Pendiente', prioridad: 'CITA', tipo: 'Cita', id: c.id
+        };
+      });
+
+      const listaCompleta = notas
+        .concat(cumples)
+        .concat(cumplesStaff)
+        .concat(citasAdaptadas)
+        .filter(ev => ev && ev.fecha);
+
+      const parseFechaParaSort = (fStr) => {
+        if (!fStr) return new Date(0);
+        const str = String(fStr).trim();
+        if (str.includes('/')) {
+          const p = str.split('/');
+          return new Date(`${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`);
+        }
+        if (str.includes('-')) {
+          return new Date(str);
+        }
+        return new Date(str);
+      };
+
+      listaCompleta.sort((a, b) => parseFechaParaSort(a.fecha) - parseFechaParaSort(b.fecha));
+
+      // Guardar en variables globales de paginación
+      window.AGENDA_ITEMS_ALL = listaCompleta;
+      window.AGENDA_ITEMS_FILTERED = [...listaCompleta];
+      window.AGENDA_CURRENT_PAGE = 1;
+
+      // Renderizar primera página
+      window.renderizarPaginaAgenda();
+
+    } catch(err) {
+      console.error("Error al cargar los datos de agenda:", err);
+      tbody.innerHTML = '<div class="text-center py-5 text-danger"><i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i> Error al cargar datos.</div>';
+    }
+  }).obtenerDatosAgendaCompletos();
+}
+
+window.renderizarPaginaAgenda = function() {
+  const tbody = document.getElementById('bodyTablaAgenda');
+  const template = document.getElementById('plantillaFilaAgenda');
+  if (!tbody || !template) return;
+
+  tbody.innerHTML = "";
+
+  const total = window.AGENDA_ITEMS_FILTERED.length;
+  if (total === 0) {
+    tbody.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-info-circle fs-3 d-block mb-2"></i> No se encontraron registros.</div>';
+    document.getElementById('infoPaginacionAgenda').textContent = "Mostrando 0 a 0 de 0 registros";
+    document.getElementById('ulPaginacionAgenda').innerHTML = "";
+    return;
+  }
+
+  const length = parseInt(document.getElementById('selectPageLengthAgenda').value) || 10;
+  const totalPages = Math.ceil(total / length);
+
+  if (window.AGENDA_CURRENT_PAGE > totalPages) {
+    window.AGENDA_CURRENT_PAGE = totalPages;
+  }
+  if (window.AGENDA_CURRENT_PAGE < 1) {
+    window.AGENDA_CURRENT_PAGE = 1;
+  }
+
+  const start = (window.AGENDA_CURRENT_PAGE - 1) * length;
+  const end = Math.min(start + length, total);
+
+  const slice = window.AGENDA_ITEMS_FILTERED.slice(start, end);
+
+  slice.forEach(ev => {
+    const clon = template.content.cloneNode(true);
+    const card = clon.querySelector('.agenda-item-card');
+    const badge = clon.querySelector('.celda-prioridad');
+    const celdaEstado = clon.querySelector('.celda-estado');
+
+    clon.querySelector('.celda-fecha').textContent = ev.fecha;
+    clon.querySelector('.celda-descripcion').textContent = ev.descripcion;
+
+    let borderLeftColor = '#3498db'; // Default azul
+
+    if (ev.tipo === 'Cumpleaños') {
+      const esStaff = ev.id && ev.id.includes("AGENTE");
+      badge.textContent = esStaff ? '🎂 CUMPLE STAFF' : '🎂 CUMPLE CLIENTE';
+      badge.className = `celda-prioridad badge ${esStaff ? 'bg-secondary bg-gradient text-white' : 'bg-warning bg-gradient text-dark'}`;
+      borderLeftColor = esStaff ? '#9b59b6' : '#f1c40f'; // Morado o Amarillo
+    } else if (ev.tipo === 'Cita') {
+      badge.className = 'celda-prioridad badge bg-success bg-gradient text-white';
+      badge.textContent = '📅 CITA';
+      borderLeftColor = '#2ecc71'; // Verde
+    } else if (ev.tipo === 'Ausencia') {
+      badge.className = 'celda-prioridad badge bg-danger bg-gradient text-white text-uppercase';
+      badge.textContent = '✈️ Ausencia';
+      borderLeftColor = '#e74c3c'; // Rojo
+    } else {
+      badge.textContent = `📝 PENDIENTE (${ev.prioridad})`;
+      if (ev.prioridad === 'Alta') {
+        badge.className = 'celda-prioridad badge bg-danger bg-gradient text-white';
+        borderLeftColor = '#e74c3c'; // Rojo
+      } else if (ev.prioridad === 'Media') {
+        badge.className = 'celda-prioridad badge bg-warning bg-gradient text-dark';
+        borderLeftColor = '#f39c12'; // Amarillo
+      } else {
+        badge.className = 'celda-prioridad badge bg-info bg-gradient text-white';
+        borderLeftColor = '#3498db'; // Azul
+      }
+    }
+
+    if (card) {
+      card.style.borderLeftColor = borderLeftColor;
+    }
+
+    if (celdaEstado) {
+      celdaEstado.textContent = ev.estado;
+      if (ev.estado === 'Completado' || ev.estado === 'Resuelta' || ev.estado === 'Realizada' || ev.estado === 'Migrado') {
+        celdaEstado.className = 'celda-estado badge rounded-pill px-3 py-1 bg-success-subtle text-success border border-success-subtle';
+      } else if (ev.estado === 'Cancelada' || ev.estado === 'Cancelado' || ev.estado === 'No asistió') {
+        celdaEstado.className = 'celda-estado badge rounded-pill px-3 py-1 bg-danger-subtle text-danger border border-danger-subtle';
+      } else {
+        celdaEstado.className = 'celda-estado badge rounded-pill px-3 py-1 bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+      }
+    }
+
+    // Botones de acción
+    const contenedorBtn = clon.querySelector('.contenedor-accion');
+    if (ev.tipo !== 'Cumpleaños') { // No se borran/editan cumples desde aquí
+       agregarBotonesAccion(contenedorBtn, ev);
+    }
+
+    tbody.appendChild(clon);
+  });
+
+  // Actualizar Info Footer
+  document.getElementById('infoPaginacionAgenda').textContent = `Mostrando ${start + 1} a ${end} de ${total} registros`;
+
+  // Renderizar Botones Paginación
+  renderizarBotonesPaginacionAgenda(totalPages);
+};
+
+function renderizarBotonesPaginacionAgenda(totalPages) {
+  const ul = document.getElementById('ulPaginacionAgenda');
+  if (!ul) return;
+  ul.innerHTML = "";
+
+  // Botón Anterior
+  const liPrev = document.createElement('li');
+  liPrev.className = `page-item ${window.AGENDA_CURRENT_PAGE === 1 ? 'disabled' : ''}`;
+  liPrev.innerHTML = `<a class="page-link border-0 rounded-3 text-dark fw-semibold" href="javascript:void(0)" onclick="window.cambiarPaginaAgenda(${window.AGENDA_CURRENT_PAGE - 1})">Anterior</a>`;
+  ul.appendChild(liPrev);
+
+  // Determinar rango de páginas a mostrar (para no desbordar si hay 50 páginas)
+  let startPage = Math.max(1, window.AGENDA_CURRENT_PAGE - 2);
+  let endPage = Math.min(totalPages, startPage + 4);
+  if (endPage - startPage < 4) {
+    startPage = Math.max(1, endPage - 4);
+  }
+
+  // Páginas
+  for (let i = startPage; i <= endPage; i++) {
+    const li = document.createElement('li');
+    li.className = `page-item ${window.AGENDA_CURRENT_PAGE === i ? 'active' : ''}`;
+    li.innerHTML = `<a class="page-link border-0 rounded-3 fw-bold px-3 ${window.AGENDA_CURRENT_PAGE === i ? '' : 'text-dark'}" href="javascript:void(0)" onclick="window.cambiarPaginaAgenda(${i})">${i}</a>`;
+    ul.appendChild(li);
+  }
+
+  // Botón Siguiente
+  const liNext = document.createElement('li');
+  liNext.className = `page-item ${window.AGENDA_CURRENT_PAGE === totalPages ? 'disabled' : ''}`;
+  liNext.innerHTML = `<a class="page-link border-0 rounded-3 text-dark fw-semibold" href="javascript:void(0)" onclick="window.cambiarPaginaAgenda(${window.AGENDA_CURRENT_PAGE + 1})">Siguiente</a>`;
+  ul.appendChild(liNext);
+}
+
+window.cambiarPaginaAgenda = function(page) {
+  window.AGENDA_CURRENT_PAGE = page;
+  window.renderizarPaginaAgenda();
+};
+
+window.onChangeLengthAgenda = function() {
+  window.AGENDA_CURRENT_PAGE = 1;
+  window.renderizarPaginaAgenda();
+};
+
+window.onSearchAgenda = function() {
+  const input = document.getElementById('inputBuscarAgendaCard');
+  if (!input) return;
+  const filtro = input.value.toLowerCase().trim();
+
+  if (!filtro) {
+    window.AGENDA_ITEMS_FILTERED = [...window.AGENDA_ITEMS_ALL];
+  } else {
+    window.AGENDA_ITEMS_FILTERED = window.AGENDA_ITEMS_ALL.filter(ev => {
+      const textToSearch = `${ev.fecha || ''} ${ev.descripcion || ''} ${ev.prioridad || ''} ${ev.estado || ''}`.toLowerCase();
+      return textToSearch.includes(filtro);
+    });
+  }
+
+  window.AGENDA_CURRENT_PAGE = 1;
+  window.renderizarPaginaAgenda();
+};
+function agregarBotonesAccion(contenedor, ev) {
+  const btnOk = document.createElement('button');
+  btnOk.className = 'btn btn-sm btn-outline-success me-1';
+  btnOk.innerHTML = '<i class="bi bi-check-lg"></i>';
+  btnOk.title = 'Marcar como completado';
+  btnOk.onclick = () => window.marcarComoHecho(ev.id);
+
+  const btnEdit = document.createElement('button');
+  btnEdit.className = 'btn btn-sm btn-outline-primary me-1';
+  btnEdit.innerHTML = '<i class="bi bi-pencil"></i>';
+  btnEdit.title = 'Editar evento';
+  btnEdit.onclick = () => window.abrirEditorEvento(ev);
+
+  const btnDel = document.createElement('button');
+  btnDel.className = 'btn btn-sm btn-outline-danger';
+  btnDel.innerHTML = '<i class="bi bi-trash3"></i>';
+  btnDel.title = 'Eliminar evento';
+  btnDel.onclick = () => window.confirmarEliminarEvento(ev.id, ev.tipo);
+
+  contenedor.appendChild(btnOk);
+  contenedor.appendChild(btnEdit);
+  contenedor.appendChild(btnDel);
+}
+// 4. UTILIDADES Y FILTRADO
+window.filtrarTablaAgenda = function() {
+  const input = document.getElementById("inputBuscarAgenda");
+  if (!input) return;
+  const filtro = input.value.toLowerCase();
+  const filas = document.querySelectorAll("#bodyTablaAgenda .agenda-item-card");
+
+  filas.forEach(fila => {
+    const texto = fila.textContent.toLowerCase();
+    fila.style.setProperty('display', texto.includes(filtro) ? 'flex' : 'none', 'important');
+  });
+};
+
+window.cambiarVistaAgenda = function(vista) {
+  const cal = document.getElementById('contenedorCalendario');
+  const tab = document.getElementById('contenedorTablaAgenda');
+  const bus = document.getElementById('busquedaAgendaContainer');
+  const btnCal = document.getElementById('btnVistaCalendario');
+  const btnTab = document.getElementById('btnVistaTabla');
+
+  if (vista === 'calendario') {
+    cal.classList.remove('d-none');
+    tab.classList.add('d-none');
+    // Aseguramos que se oculte el buscador en calendario
+    if(bus) bus.classList.add('d-none'); 
+    
+    btnCal.classList.add('active');
+    btnTab.classList.remove('active');
+    if (calendar) setTimeout(() => calendar.updateSize(), 200);
+  } else {
+    cal.classList.add('d-none');
+    tab.classList.remove('d-none');
+    // Aseguramos que se muestre el buscador SOLO en tabla
+    if(bus) bus.classList.remove('d-none'); 
+    
+    btnTab.classList.add('active');
+    btnCal.classList.remove('active');
+    cargarDatosDesdeGoogleSheets();
+  }
+};
+
+window.toggleFormEvento = function() {
+  const form = document.getElementById('seccionNuevoEvento');
+  if (form) form.classList.toggle('d-none');
+};
+
+window.marcarComoHecho = function(id) {
+  google.script.run.withSuccessHandler(function() {
+    Swal.fire('Actualizado', 'Tarea completada', 'success');
+    ejecutarCargaAgenda();
+  }).actualizarEstadoEvento(id, "Completado");
+};
+
+function transformarFechaParaCalendario(fechaStr) {
+  if (!fechaStr) return null;
+  const f = fechaStr.toString().trim();
+  
+  // Si ya es ISO (2026-01-10)
+  if (f.includes('-') && f.split('-')[0].length === 4) return f;
+  
+  // Si es DD/MM/YYYY (10/01/2026)
+  const p = f.split('/');
+  if (p.length === 3) {
+    return `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+  }
+  
+  // Si viene en formato ISO completo con 'T' (ej: 2026-01-10T00:00:00.000Z)
+  if (f.includes('T')) {
+    return f.split('T')[0];
+  }
+  
+  console.warn("JS: Formato de fecha no reconocido:", fechaStr);
+  return null;
+}
+
+function guardarNuevaNota() {
+  const idExistente = document.getElementById('regId').value;
+  const objeto = {
+    id: idExistente,
+    tipo: document.getElementById('regTipo').value,
+    prioridad: document.getElementById('regPrioridad').value,
+    descripcion: document.getElementById('regDesc').value
+  };
+
+  if (!objeto.descripcion) return Swal.fire("Aviso", "Agrega una descripción", "warning");
+
+  // Si hay ID, llamamos a actualizar, si no, a guardar nuevo
+  const funcionServer = idExistente ? "actualizarNotaAgenda" : "guardarNotaAgenda";
+  
+  google.script.run.withSuccessHandler(() => {
+    Swal.fire("Éxito", "Registro procesado", "success");
+    resetearFormulario();
+    ejecutarCargaAgenda(); // Esto refresca tabla y calendario
+  })[funcionServer](objeto);
+}
+function mostrarDetalleCitas(citas, fechaIso) {
+  // Convertimos yyyy-mm-dd a dd/mm/yyyy para el título
+  const fechaTitulo = fechaIso.split('-').reverse().join('/');
+  
+  let tablaHtml = `
+    <div class="table-responsive">
+      <table class="table table-sm table-striped mt-2" style="font-size: 13px;">
+        <thead>
+          <tr class="table-dark">
+            <th>Hora</th>
+            <th>Agente</th> <th>Cliente</th>
+            <th>Servicio</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  citas.forEach(c => {
+    tablaHtml += `
+      <tr>
+        <td><strong>${c.hora}</strong></td>
+        <td>${c.agente || 'No asignado'}</td> <td>${c.cliente}</td>
+        <td><span class="badge bg-light text-dark border">${c.servicio}</span></td>
+      </tr>
+    `;
+  });
+
+  tablaHtml += `</tbody></table></div>`;
+
+  Swal.fire({
+    title: `Citas del día ${fechaTitulo}`,
+    html: tablaHtml,
+    width: '500px',
+    confirmButtonText: 'Entendido',
+    confirmButtonColor: '#28a745'
+  });
+}
+// Función para cargar datos en el formulario
+window.abrirEditorEvento = function(ev) {
+  // Mostrar el formulario si está oculto
+  const form = document.getElementById('seccionNuevoEvento');
+  form.classList.remove('d-none');
+  
+  // Llenar campos
+  document.getElementById('regId').value = ev.id || "";
+  document.getElementById('regTipo').value = ev.tipo || "Tarea";
+  document.getElementById('regPrioridad').value = ev.prioridad || "Media";
+  
+  // Limpiar prefijo "CITA:" si existe en la descripción
+  let desc = ev.descripcion || "";
+  document.getElementById('regDesc').value = desc.replace("CITA: ", "");
+  
+  // Cambiar texto del botón para feedback visual
+  const btn = document.querySelector("#seccionNuevoEvento .btn-success");
+  btn.innerHTML = '<i class="bi bi-pencil-square me-1"></i> Actualizar';
+};
+
+function resetearFormulario() {
+  document.getElementById('regId').value = "";
+  document.getElementById('regDesc').value = "";
+  const btn = document.querySelector("#seccionNuevoEvento .btn-success");
+  btn.innerHTML = '<i class="bi bi-save me-1"></i> Guardar';
+}
+window.confirmarEliminarEvento = function(id, tipo) {
+  Swal.fire({
+    title: "¿Eliminar registro?",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    confirmButtonText: 'Sí, eliminar'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      google.script.run.withSuccessHandler(() => {
+        Swal.fire('Eliminado', 'El registro ha sido borrado', 'success');
+        ejecutarCargaAgenda();
+      }).eliminarRegistroAgenda(id, tipo); // Llamada real a tu función .gs
+    }
+  });
+};
+
+// --- LOGICA DINAMICA DE AUSENCIAS ---
+
+window.toggleTipoFormularioAgenda = function() {
+  const tipo = document.getElementById('regTipo').value;
+  const contPrio = document.getElementById('contenedorPrioridad');
+  const contDesc = document.getElementById('contenedorDescripcion');
+  const contAusencia = document.getElementById('contenedorAusenciaStaff');
+  
+  if (tipo === 'Ausencia') {
+    if (contPrio) contPrio.classList.add('d-none');
+    if (contDesc) contDesc.classList.add('d-none');
+    if (contAusencia) contAusencia.classList.remove('d-none');
+    
+    poblarSelectorAgentesAusencia();
+  } else {
+    if (contPrio) contPrio.classList.remove('d-none');
+    if (contDesc) contDesc.classList.remove('d-none');
+    if (contAusencia) contAusencia.classList.add('d-none');
+  }
+};
+
+function poblarSelectorAgentesAusencia() {
+  const select = document.getElementById('regAgenteAbsence');
+  if (!select) return;
+  select.innerHTML = '<option value="">Cargando colaboradores...</option>';
+  
+  google.script.run.withSuccessHandler(function(resRaw) {
+    try {
+      const agentes = JSON.parse(resRaw);
+      select.innerHTML = '<option value="">-- Seleccionar Colaborador --</option>';
+      agentes.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = a.apodo || a.nombre_completo;
+        select.appendChild(opt);
+      });
+    } catch(err) {
+      console.error("Error al parsear agentes activos:", err);
+      select.innerHTML = '<option value="">Error al cargar agentes</option>';
+    }
+  }).obtenerAgentesActivosBasico();
+}
+
+window.guardarAusenciaStaff = function() {
+  const agenteId = document.getElementById('regAgenteAbsence').value;
+  const motivo = document.getElementById('regMotivoAbsence').value;
+  const fechaFin = document.getElementById('regFechaFinAbsence').value;
+  
+  if (!agenteId) return Swal.fire("Aviso", "Por favor seleccione un colaborador", "warning");
+  if (!fechaFin) return Swal.fire("Aviso", "Por favor seleccione la fecha de retorno / fin", "warning");
+  
+  const hoyStr = new Date().toISOString().split('T')[0];
+  
+  const objeto = {
+    agenteId: agenteId,
+    motivo: motivo,
+    fechaInicio: hoyStr,
+    fechaFin: fechaFin,
+    comentario: ""
+  };
+  
+  if (window.mostrarCargando) window.mostrarCargando();
+  
+  google.script.run.withSuccessHandler(function(res) {
+    if (window.ocultarCargando) window.ocultarCargando();
+    Swal.fire("Éxito", "Ausencia de personal registrada correctamente", "success");
+    
+    // Limpiar campos y restablecer
+    document.getElementById('regAgenteAbsence').value = "";
+    document.getElementById('regFechaFinAbsence').value = "";
+    
+    const form = document.getElementById('seccionNuevoEvento');
+    if (form) form.classList.add('d-none');
+    
+    document.getElementById('regTipo').value = "Tarea";
+    window.toggleTipoFormularioAgenda();
+    
+    ejecutarCargaAgenda();
+  }).guardarAusenciaAgente(objeto);
+};
+</script>

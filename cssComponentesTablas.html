@@ -1,0 +1,373 @@
+<style>
+/* ==========================================================================
+   6. TABLAS Y ESTADOS
+   ========================================================================== */
+
+.table-header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.p-custom-table {
+  padding: 12px;
+  min-height: 450px; 
+  display: flex;
+  flex-direction: column;
+}
+
+.template-disponibilidadTurnosEstado {
+  text-align: center !important;
+}
+
+.template-disponibilidadTurnosEstado-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-weight: 700 !important;
+  text-align: center;
+  min-width: 110px; 
+  color: white !important; 
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.dropdown-toggle.btn-light {
+    background-color: #ffc107 !important;
+    border-color: #ffc107 !important;
+    color: #000 !important;
+}
+
+.dropdown-toggle.btn-light:hover {
+    background-color: #e0a800 !important;
+    border-color: #d39e00 !important;
+}
+
+.estado-disponible .template-disponibilidadTurnosEstado-badge { background-color: #FFC900 !important; color: black !important; }
+.estado-ausente .template-disponibilidadTurnosEstado-badge { background-color: #9e0812 !important; color: white !important; }
+.estado-asesorando .template-disponibilidadTurnosEstado-badge { background-color: #fd7e14 !important; }
+.estado-en-refrigerio .template-disponibilidadTurnosEstado-badge { background-color: #343a40 !important; }
+.estado-trabajando .template-disponibilidadTurnosEstado-badge { background-color: #000DFF !important; }
+.estado-pasar-la-voz .template-disponibilidadTurnosEstado-badge { background-color: #00d9ff !important; color: black !important; }
+.estado-salió-del-salón .template-disponibilidadTurnosEstado-badge { background-color: #870404 !important; }
+.estado-en-otro-salón .template-disponibilidadTurnosEstado-badge { background-color: #034508 !important; }
+.estado-en-terapia .template-disponibilidadTurnosEstado-badge { background-color: #7a04c9 !important; }
+.estado-psicólogo .template-disponibilidadTurnosEstado-badge { background-color: #6c757d !important; }
+.estado-corte-caballero	 .template-disponibilidadTurnosEstado-badge { color: black !important; }
+.estado-corrigiendo	 .template-disponibilidadTurnosEstado-badge { color: black !important; }
+.fila-cita-pendiente { background-color: #f5dab0 !important; }
+.estado-vendiendo .template-disponibilidadTurnosEstado-badge { background-color: #fd7e14 !important; color: black !important; }
+
+/* ==========================================================================
+   7. ELEMENTOS DE CARGA (CORRECCIÓN DE CONGELAMIENTO Y CAPAS)
+   ========================================================================== */
+
+#loading-overlay {
+    position: fixed;
+    top: 0; 
+    left: 0;
+    width: 100%; 
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8); /* Fondo un poco más denso para visibilidad */
+    display: none; 
+    justify-content: center;
+    align-items: center;
+    /* 🚨 AJUSTE CRUCIAL: z-index superior a Modales (1050) y SweetAlert (1060+) */
+    z-index: 2000 !important; 
+    flex-direction: column;
+    pointer-events: none; 
+}
+
+/* Solo bloqueamos clics cuando el spinner esté realmente visible */
+#loading-overlay[style*="display: flex"] {
+    pointer-events: all;
+}
+
+.spinner-custom {
+    width: 60px; /* Un poco más grande para que destaque */
+    height: 60px;
+    border: 6px solid #f3f3f3;
+    border-top: 6px solid var(--color-morado); 
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+}
+
+@keyframes spin { 
+    0% { transform: rotate(0deg); } 
+    100% { transform: rotate(360deg); } 
+}
+
+.loading-text {
+    margin-top: 15px;
+    font-weight: 800;
+    color: var(--color-morado);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+}
+
+/* Reloj y Fecha */
+.clock { color: #4fb4a6; font-size: 28px; font-weight: 800; text-align: center; line-height: 1; }
+.date { color: #6c757d; font-weight: 500; text-align: center; margin-bottom: 5px; }
+
+/* Botones genéricos */
+.btn-morado { background-color: var(--color-morado); color: white; }
+.btn-turquesa { background-color: var(--color-turquesa); color: white; }
+.btn-verde-custom { background-color: var(--color-verde-custom); color: white; }
+
+.modal-content { border-radius: 15px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+
+/* ==========================================================================
+   8. COMPONENTES DEL MODAL DE AGENDA (ESPECÍFICO)
+   ========================================================================== */
+
+/* Estilos para el contenedor del calendario */
+#calendar {
+    max-width: 100%;
+    margin: 0 auto;
+    background: white;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+/* Personalización de los eventos en FullCalendar */
+.fc-event {
+    cursor: pointer;
+    border-radius: 4px !important;
+    padding: 2px 5px !important;
+    font-size: 0.85em !important;
+    border: none !important;
+    transition: var(--transition-fast);
+}
+
+.fc-event:hover {
+    filter: brightness(0.9);
+    transform: scale(1.02);
+}
+
+/* --- NUEVO: Buscador de Agenda --- */
+#busquedaAgendaContainer {
+    flex: 1; 
+    min-width: 200px; /* Evita que colapse a un cuadro azul pequeño */
+    max-width: 400px; 
+    margin: 0 15px;
+}
+
+#inputBuscarAgenda {
+    border-left: none !important;
+}
+#busquedaAgendaContainer .input-group-text {
+    background-color: #fff;
+    border-right: none;
+    color: #6c757d;
+}
+/* Solo se aplica flex cuando NO tiene d-none */
+#busquedaAgendaContainer:not(.d-none) {
+    display: flex;
+}
+
+/* Estilos específicos para la Tabla de Listado de Agenda */
+#contenedorTablaAgenda .table {
+    border-collapse: separate;
+    border-spacing: 0 8px; /* Crea el efecto de filas separadas */
+}
+
+#contenedorTablaAgenda tbody tr {
+    transition: var(--transition-fast);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+}
+
+#contenedorTablaAgenda tbody tr:hover {
+    background-color: #f8f9fa !important;
+    transform: scale(1.005);
+}
+
+/* Fila de cumpleaños (table-warning personalizado) */
+.table-warning {
+    background-color: #fff9e6 !important; /* Amarillo más suave */
+    border-left: 4px solid #ffc107 !important; /* Indicador lateral de importancia */
+}
+
+/* Botones dentro de la tabla de agenda */
+.contenedor-accion .btn {
+    min-height: 32px !important;
+    font-size: 12px !important;
+    border-radius: 6px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px; /* Espacio entre icono y texto */
+    padding: 2px 10px !important;
+    transition: all 0.2s;
+}
+
+/* Ajustes para el badge de prioridad en la tabla */
+.celda-prioridad {
+    text-transform: uppercase;
+    font-size: 0.7em !important;
+    padding: 5px 10px !important;
+    letter-spacing: 0.5px;
+    border-radius: 20px !important; /* Estilo píldora más moderno */
+}
+
+/* Ajuste para iconos de Bootstrap */
+.bi {
+    line-height: 1;
+    vertical-align: -0.125em;
+}
+.btn-success {
+    background-color: #198754 !important;
+    border-color: #198754 !important;
+}
+
+.btn-historial-search:hover {
+  background-color: #0d6efd;
+  color: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Evita que el texto del input se meta debajo del botón */
+#clientesDatalistOATC {
+  padding-right: 75px !important; 
+}
+.row.g-2 {
+    --bs-gutter-x: 0.5rem;
+}
+
+/* SECCION DE MODAL NOTAS DE OATC RESUELTA */
+#modalNotasOATC .modal-content {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+#modalNotasOATC .modal-header {
+    background: #00d4ff; 
+    color: white;
+    border-bottom: none;
+    padding: 12px 20px;
+}
+
+#modalNotasOATC .modal-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+#modalNotasOATC .modal-body {
+    padding: 20px;
+    background-color: #ffffff;
+}
+
+#modalNotasOATC .form-label {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #6c757d;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#modalNotasOATC .input-group {
+    flex-direction: row !important; 
+    align-items: stretch;
+}
+
+#modalNotasOATC #notaMonto {
+    flex: 1; 
+    border-left: none;
+    background-color: #f8f9fa;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #333;
+    width: 100%; 
+    padding-left: 10px;
+}
+
+#modalNotasOATC #notaTexto {
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    padding: 10px;
+    font-size: 0.9rem;
+    resize: none;
+    transition: border-color 0.2s;
+}
+
+#modalNotasOATC #notaTexto:focus {
+    border-color: #00d4ff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 212, 255, 0.15);
+    outline: none;
+}
+
+/* Botón Guardar Estilo "Gloss" */
+#modalNotasOATC .btn-primary {
+    background: #007bff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+#modalNotasOATC .btn-primary:hover {
+    background: #0056b3;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+/* Estilo para que el buscador de caja sea profesional */
+#listaBusquedaProductos {
+  z-index: 1060; 
+  max-height: 200px;
+  overflow-y: auto;
+  background: white;
+  border-radius: 0 0 8px 8px;
+}
+
+#buscarProductoCaja:focus {
+  border-color: #198754;
+  box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25);
+}
+
+/* ==========================================================================
+   Dark Theme Components Overrides
+   ========================================================================== */
+body.dark-theme .table-header-container {
+  background-color: #2b2b2b !important;
+  border-bottom-color: #3d3d3d !important;
+}
+
+body.dark-theme .table {
+  color: #f8f9fa !important;
+  background-color: #1e1e1e !important;
+  border-color: #2d2d2d !important;
+}
+
+body.dark-theme .table th, 
+body.dark-theme .table td {
+  color: #f8f9fa !important;
+  border-color: #2d2d2d !important;
+  background-color: #1e1e1e !important;
+}
+
+body.dark-theme .list-group-item {
+  background-color: #1e1e1e !important;
+  color: #f8f9fa !important;
+  border-color: #2d2d2d !important;
+}
+
+body.dark-theme .modal-content {
+  background-color: #1e1e1e !important;
+  color: #f8f9fa !important;
+}
+
+body.dark-theme .modal-header {
+  border-bottom-color: #3d3d3d !important;
+}
+
+body.dark-theme .modal-footer {
+  border-top-color: #3d3d3d !important;
+}
+</style>

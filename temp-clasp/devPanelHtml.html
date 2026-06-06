@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Secreto del Desarrollador - Gloss 2.0</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #0c0c14;
+            color: #e2e8f0;
+            padding-bottom: 50px;
+        }
+
+        .header-glow {
+            background: linear-gradient(135deg, #1e1b4b, #0c0c14);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 20px 0;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .header-glow h1 {
+            font-weight: 800;
+            background: linear-gradient(to right, #f43f5e, #fb7185);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .card-glass {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            margin-bottom: 24px;
+        }
+
+        .nav-pills .nav-link {
+            color: #94a3b8;
+            border-radius: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+            border: 1px solid transparent;
+        }
+
+        .nav-pills .nav-link.active {
+            background: linear-gradient(135deg, #f43f5e, #fb7185) !important;
+            color: white;
+            box-shadow: 0 4px 15px rgba(244, 63, 94, 0.3);
+        }
+
+        .nav-pills .nav-link:hover:not(.active) {
+            border-color: rgba(244, 63, 94, 0.3);
+            color: #fb7185;
+        }
+
+        .table-dark-glass {
+            --bs-table-bg: transparent;
+            color: #e2e8f0;
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .table-dark-glass th {
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            color: #fb7185;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .table-dark-glass td {
+            vertical-align: middle;
+            font-size: 0.9rem;
+        }
+
+        .btn-action {
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-weight: 600;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(12, 12, 20, 0.85);
+            z-index: 1050;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body>
+    <script>
+      window.addEventListener('error', function(e) {
+        console.error("DEV PANEL CRITICAL RUNTIME ERROR:", e.error);
+        if (window.Swal) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error de Inicialización del Panel',
+            text: e.message,
+            footer: 'Archivo: ' + e.filename + ' | Línea: ' + e.lineno
+          });
+        } else {
+          alert("ERROR EN PANEL:\n" + e.message + "\nArchivo: " + e.filename + "\nLínea: " + e.lineno);
+        }
+      });
+    </script>
+
+    <div id="loading" class="loading-overlay">
+        <div class="spinner-border text-danger" style="width: 3rem; height: 3rem;" role="status"></div>
+        <p class="mt-3 text-muted">Consultando Supabase en Tiempo Real...</p>
+    </div>
+
+    <!-- HEADER -->
+    <div class="header-glow mb-4">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div>
+                <h1>PANEL SECRETO DEL DESARROLLADOR</h1>
+                <p class="text-muted mb-0">Auditoría Directa de Tablas Relacionales & Garbage Recovery</p>
+            </div>
+            <button class="btn btn-outline-danger" onclick="cerrarSesion()">
+                Cerrar Sesión <i class="fa-solid fa-power-off ms-2"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN PANEL -->
+    <div class="container">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card-glass p-3">
+                    <h5 class="fw-bold mb-3 text-danger"><i class="fa-solid fa-database me-2"></i>Tablas</h5>
+                    <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist">
+                        <button class="nav-link active text-start mb-2" onclick="cargarTabla('usuarios')">
+                            <i class="fa-solid fa-user-shield me-2"></i> Usuarios del Sistema
+                        </button>
+                        <button class="nav-link text-start mb-2" onclick="cargarTabla('clientes')">
+                            <i class="fa-solid fa-users me-2"></i> Clientes
+                        </button>
+                        <button class="nav-link text-start mb-2" onclick="cargarTabla('agentes')">
+                            <i class="fa-solid fa-id-card me-2"></i> Fichas Agentes
+                        </button>
+                        <button class="nav-link text-start mb-2" onclick="cargarTabla('control_asistencia')">
+                            <i class="fa-solid fa-clipboard-user me-2"></i> Control Asistencia
+                        </button>
+                        <button class="nav-link text-start mb-2" onclick="cargarTabla('oatc')">
+                            <i class="fa-solid fa-file-invoice-dollar me-2"></i> Órdenes (OATC)
+                        </button>
+                        <button class="nav-link text-start mb-2" onclick="cargarTabla('registro_citas')">
+                            <i class="fa-solid fa-calendar-check me-2"></i> Registro Citas
+                        </button>
+                        <button class="nav-link text-start mb-2" onclick="cargarTabla('ventas_caja')">
+                            <i class="fa-solid fa-cash-register me-2"></i> Ventas Caja
+                        </button>
+                        <button class="nav-link text-start mb-2 text-warning" onclick="cargarTabla('garbage')">
+                            <i class="fa-solid fa-trash-arrow-up me-2"></i> Papelera (Garbage)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-9">
+                <div class="card-glass p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="fw-bold text-white mb-0" id="nombreTablaSeleccionada">Usuarios del Sistema</h3>
+                        <button class="btn btn-success btn-action" id="btnAgregarFila" onclick="abrirModalAgregar()">
+                            <i class="fa-solid fa-plus me-2"></i> Agregar Fila
+                        </button>
+                    </div>
+
+                    <!-- GRID VIEW -->
+                    <div class="table-responsive">
+                        <table class="table table-dark-glass table-hover align-middle" id="tablaSecreta">
+                            <thead id="tablaSecretaHead">
+                                <!-- Cabeceras dinámicas -->
+                            </thead>
+                            <tbody id="tablaSecretaBody">
+                                <!-- Filas dinámicas -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL AGREGAR/EDITAR -->
+    <div class="modal fade" id="modalEdicion" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark border-secondary text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title fw-bold" id="modalEdicionTitulo">Agregar Fila</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="modalEdicionBody">
+                    <!-- Formulario dinámico -->
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" onclick="guardarFila()">Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap & SweetAlert -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let tablaActiva = 'usuarios';
+        let columnasTabla = [];
+        let registroSeleccionadoEdicion = null;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            console.log("DEBUG: DOM cargado en devPanelHtml.html. Retardando consulta inicial para evitar error de posting URI...");
+            // Retardamos la primera consulta a Supabase 1.5 segundos.
+            // Esto permite que el canal de comunicación 'postMessage' de Google Apps Script 
+            // se inicialice de forma segura y completa con el Host principal antes de hacer llamadas.
+            setTimeout(() => {
+                console.log("DEBUG: Ejecutando cargarTabla('usuarios') inicial...");
+                cargarTabla('usuarios');
+            }, 1500);
+        });
+
+        function mostrarCargando() {
+            document.getElementById('loading').style.display = 'flex';
+        }
+
+        function ocultarCargando() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function cargarTabla(nombreTabla) {
+            tablaActiva = nombreTabla;
+            document.getElementById('nombreTablaSeleccionada').innerText = nombreTabla.toUpperCase();
+            
+            // Ocultar botón agregar si es la papelera (garbage)
+            document.getElementById('btnAgregarFila').style.display = (nombreTabla === 'garbage') ? 'none' : 'block';
+
+            mostrarCargando();
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    ocultarCargando();
+                    renderizarTablaSecreta(res);
+                })
+                .withFailureHandler(function(err) {
+                    ocultarCargando();
+                    Swal.fire('Error', 'Fallo al cargar la tabla: ' + err.message, 'error');
+                })
+                .obtenerDatosTablaSecreta(nombreTabla);
+        }
+
+        function renderizarTablaSecreta(res) {
+            const head = document.getElementById('tablaSecretaHead');
+            const body = document.getElementById('tablaSecretaBody');
+            head.innerHTML = '';
+            body.innerHTML = '';
+
+            if (!res || res.length === 0) {
+                body.innerHTML = '<tr><td colspan="10" class="text-center text-muted p-4">La tabla está vacía.</td></tr>';
+                return;
+            }
+
+            columnasTabla = Object.keys(res[0]);
+
+            // Crear cabeceras
+            let headHTML = '<tr>';
+            columnasTabla.forEach(col => {
+                headHTML += `<th>${col}</th>`;
+            });
+            headHTML += '<th class="text-center">Acciones</th></tr>';
+            head.innerHTML = headHTML;
+
+            // Rellenar filas
+            res.forEach(row => {
+                let rowHTML = '<tr>';
+                columnasTabla.forEach(col => {
+                    let val = row[col];
+                    if (val && typeof val === 'object') val = JSON.stringify(val);
+                    rowHTML += `<td>${val === null ? '<span class="text-muted">null</span>' : val}</td>`;
+                });
+
+                // Botones dinámicos según tabla
+                if (tablaActiva === 'garbage') {
+                    rowHTML += `<td class="text-center">
+                        <button class="btn btn-sm btn-outline-warning" onclick="restaurarFila('${row.id}')">
+                            <i class="fa-solid fa-undo me-1"></i> Restaurar
+                        </button>
+                    </td>`;
+                } else {
+                    rowHTML += `<td class="text-center">
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-info" onclick='abrirModalEditar(${JSON.stringify(row)})'>
+                                <i class="fa-solid fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="eliminarFilaSecreta('${row.id}')">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>`;
+                }
+                rowHTML += '</tr>';
+                body.innerHTML += rowHTML;
+            });
+        }
+
+        function abrirModalAgregar() {
+            registroSeleccionadoEdicion = null;
+            document.getElementById('modalEdicionTitulo').innerText = `Agregar Fila en ${tablaActiva.toUpperCase()}`;
+            
+            const body = document.getElementById('modalEdicionBody');
+            body.innerHTML = '';
+
+            columnasTabla.forEach(col => {
+                if (col === 'id' || col === 'created_at' || col === 'ficha_id' || col === 'correlativo') return;
+                
+                body.innerHTML += `
+                    <div class="mb-3">
+                        <label class="form-label">${col}</label>
+                        <input type="text" class="form-control bg-dark text-white border-secondary" id="form_${col}">
+                    </div>
+                `;
+            });
+
+            const modal = new bootstrap.Modal(document.getElementById('modalEdicion'));
+            modal.show();
+        }
+
+        function abrirModalEditar(row) {
+            registroSeleccionadoEdicion = row;
+            document.getElementById('modalEdicionTitulo').innerText = `Editar Fila #${row.id.substring(0,8)}`;
+            
+            const body = document.getElementById('modalEdicionBody');
+            body.innerHTML = '';
+
+            columnasTabla.forEach(col => {
+                if (col === 'id' || col === 'created_at' || col === 'ficha_id' || col === 'correlativo') return;
+                
+                body.innerHTML += `
+                    <div class="mb-3">
+                        <label class="form-label">${col}</label>
+                        <input type="text" class="form-control bg-dark text-white border-secondary" id="form_${col}" value="${row[col] || ''}">
+                    </div>
+                `;
+            });
+
+            const modal = new bootstrap.Modal(document.getElementById('modalEdicion'));
+            modal.show();
+        }
+
+        function guardarFila() {
+            const payload = {};
+            columnasTabla.forEach(col => {
+                if (col === 'id' || col === 'created_at' || col === 'ficha_id' || col === 'correlativo') return;
+                const input = document.getElementById(`form_${col}`);
+                if (input) payload[col] = input.value === "" ? null : input.value;
+            });
+
+            mostrarCargando();
+            bootstrap.Modal.getInstance(document.getElementById('modalEdicion')).hide();
+
+            const isEdit = registroSeleccionadoEdicion !== null;
+            const actionFunc = isEdit 
+                ? google.script.run.withSuccessHandler(res => { ocultarCargando(); Swal.fire('Éxito', 'Registro modificado', 'success'); cargarTabla(tablaActiva); })
+                : google.script.run.withSuccessHandler(res => { ocultarCargando(); Swal.fire('Éxito', 'Registro creado', 'success'); cargarTabla(tablaActiva); });
+
+            if (isEdit) {
+                actionFunc.editarFilaSecreta(tablaActiva, registroSeleccionadoEdicion.id, payload);
+            } else {
+                actionFunc.crearFilaSecreta(tablaActiva, payload);
+            }
+        }
+
+        function eliminarFilaSecreta(id) {
+            Swal.fire({
+                title: '¿Confirmar eliminación?',
+                text: "El registro será enviado a la papelera (Garbage)",
+                icon: 'warning',
+                showCancelButton: true,
+                input: 'text',
+                inputLabel: 'Justificación requerida:',
+                inputPlaceholder: 'Indique el motivo de la eliminación...',
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Sí, enviar a Garbage'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    if (!result.value) {
+                        Swal.fire('Error', 'Debe indicar una justificación para eliminar.', 'error');
+                        return;
+                    }
+
+                    mostrarCargando();
+                    google.script.run
+                        .withSuccessHandler(function(res) {
+                            ocultarCargando();
+                            Swal.fire('Eliminado', 'Enviado a Garbage.', 'success');
+                            cargarTabla(tablaActiva);
+                        })
+                        .withFailureHandler(function(err) {
+                            ocultarCargando();
+                            Swal.fire('Error', err.message, 'error');
+                        })
+                        .eliminarFilaSecretaConGarbage(tablaActiva, id, result.value);
+                }
+            });
+        }
+
+        function restaurarFila(garbageId) {
+            mostrarCargando();
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    ocultarCargando();
+                    Swal.fire('Restaurado', 'El registro regresó a su tabla original.', 'success');
+                    cargarTabla('garbage');
+                })
+                .withFailureHandler(function(err) {
+                    ocultarCargando();
+                    Swal.fire('Error', err.message, 'error');
+                })
+                .restaurarFilaSecreta(garbageId);
+        }
+
+        function cerrarSesion() {
+            if (window.cerrarSistema) {
+                window.cerrarSistema();
+            } else {
+                localStorage.clear();
+                const url = window.location.href.split('?')[0];
+                window.open(url, '_top');
+            }
+        }
+    </script>
+</body>
+</html>

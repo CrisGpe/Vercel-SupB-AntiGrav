@@ -1,0 +1,424 @@
+<!-- 1. Modal para Consultar Historial de Atenciones (modalHistorialCliente) -->
+<div class="modal fade" id="modalHistorialCliente" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content shadow-lg border-0">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title"><i class="fas fa-history me-2"></i>Historial de Atenciones: <span id="historialNombreCliente"></span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Fecha</th>
+                <th>Servicio/Atención</th>
+                <th>Especialista</th>
+                <th class="pe-3 text-end">Monto</th>
+              </tr>
+            </thead>
+            <tbody id="tablaHistorialCuerpo">
+              </tbody>
+          </table>
+        </div>
+        <div id="historialCargando" class="text-center p-5 d-none">
+          <div class="spinner-border text-primary" role="status"></div>
+          <p class="mt-2 text-muted">Buscando registros...</p>
+        </div>
+        <div id="historialVacio" class="text-center p-5 d-none">
+          <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+          <p class="text-muted">No se encontraron atenciones previas para este cliente.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. Modal para Registrar Cliente (modalCliente) -->
+<div id="modalCliente" class="modal fade" tabindex="-1" aria-labelledby="modalClienteLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden; background: #fdfbfb;">
+      <div class="modal-header px-4 py-3 border-0" style="background: linear-gradient(135deg, #111 0%, #0d6efd 100%);">
+        <h5 class="modal-title fs-5 fw-bold text-white d-flex align-items-center" id="modalClienteLabel">
+          <i class="bi bi-person-plus-fill me-2 fs-4 text-warning"></i> Registrar Nuevo Cliente
+        </h5>
+        <button type="button" class="btn-close btn-close-white" onclick="cerrarModalCliente()"></button>
+      </div>
+      <div class="modal-body p-4">
+        <form id="formNuevoCliente">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="nombreClienteModal" class="form-label text-muted small fw-semibold">Nombre(s)</label>
+              <input type="text" id="nombreClienteModal" class="form-control border-2 shadow-sm" style="border-radius: 8px;" required placeholder="Ej: Juan">
+            </div>
+            <div class="col-md-6">
+              <label for="apellidoClienteModal" class="form-label text-muted small fw-semibold">Apellido(s)</label>
+              <input type="text" id="apellidoClienteModal" class="form-control border-2 shadow-sm" style="border-radius: 8px;" required placeholder="Ej: Pérez">
+            </div>
+            <div class="col-12">
+              <label for="dniClienteModal" class="form-label text-muted small fw-semibold">DNI / Documento</label>
+              <input type="number" id="dniClienteModal" class="form-control border-2 shadow-sm" style="border-radius: 8px;" placeholder="Número de identificación">
+            </div>
+            <div class="col-12">
+              <label for="cumpleanosClienteModal" class="form-label text-muted small fw-semibold">📅 Fecha de Cumpleaños</label>
+              <input type="date" id="cumpleanosClienteModal" class="form-control border-2 shadow-sm" style="border-radius: 8px;">
+            </div>
+            <div class="col-12">
+              <label for="celularClienteModal" class="form-label text-muted small fw-semibold">Celular / Teléfono</label>
+              <input type="number" id="celularClienteModal" class="form-control border-2 shadow-sm" style="border-radius: 8px;" placeholder="999000999">
+            </div>
+            <div class="col-12">
+              <label for="correoClienteModal" class="form-label text-muted small fw-semibold">Correo Electrónico</label>
+              <input type="email" id="correoClienteModal" class="form-control border-2 shadow-sm" style="border-radius: 8px;" placeholder="usuario@ejemplo.com">
+            </div>
+          </div>
+          <div id="statusMessageModal" class="mt-3 animate__animated animate__fadeIn"></div>
+        </form>
+      </div>
+      <div class="modal-footer bg-light border-0 p-3">
+        <button type="button" class="btn btn-outline-secondary px-4 fw-bold shadow-sm" style="border-radius: 30px;" onclick="cerrarModalCliente()">Cerrar</button>
+        <button type="button" class="btn btn-primary bg-gradient px-4 fw-bold shadow-sm" style="border-radius: 30px;" onclick="guardarCliente()">
+          <i class="bi bi-save me-1"></i> Guardar Cliente
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. Modal para Edicion de Cliente en OATC (modalEdicionCliente) -->
+<div id="modalEdicionCliente" class="modal fade" tabindex="-1" aria-labelledby="modalEdicionClienteLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden; background: #fdfbfb;">
+      <div class="modal-header px-4 py-3 border-0" style="background: linear-gradient(135deg, #111 0%, #ffc107 100%);">
+        <h5 class="modal-title fs-5 fw-bold text-dark d-flex align-items-center" id="modalEdicionClienteTitulo">
+          <i class="bi bi-person-gear me-2 fs-4"></i> Editar Cliente de OATC
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <form id="formEdicionCliente">
+          <div class="mb-3">
+            <label for="inputNuevoNombreCliente" class="form-label text-muted small fw-semibold">Buscar y Seleccionar Nuevo Cliente</label>
+            <div class="input-group shadow-sm" style="border-radius: 8px; overflow: hidden;">
+              <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+              <input type="text" class="form-control border-start-0 py-2 ps-1 border-2" id="inputNuevoNombreCliente" 
+                    placeholder="Nombre, DNI o Celular..." oninput="filtrarListaClientes()">
+            </div>
+            <div id="resultadosBusquedaClientes" class="list-group mt-2 border border-2 shadow-sm rounded-3 overflow-hidden" style="max-height: 200px; overflow-y: auto; background: white;"></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer bg-light border-0 p-3">
+        <button type="button" class="btn btn-outline-secondary px-4 fw-bold shadow-sm" style="border-radius: 30px;" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-warning bg-gradient px-4 fw-bold shadow-sm text-dark" style="border-radius: 30px;" onclick="window.guardarEdicionCliente()">Guardar Cambios</button> 
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/**
+ * --- GESTIÓN DE HISTORIAL DE CLIENTE ---
+ */
+function buscarHistorialServidor(nombreCliente) {
+  if (!nombreCliente) {
+    Swal.fire('Atención', 'Seleccione un cliente primero', 'warning');
+    return;
+  }
+
+  // 1. Mostrar estado de carga en el modal y abrirlo
+  const modalElem = document.getElementById('modalHistorialCliente');
+  const modalBS = new bootstrap.Modal(modalElem);
+  
+  document.getElementById('historialNombreCliente').innerText = nombreCliente;
+  document.getElementById('historialCargando').classList.remove('d-none');
+  document.getElementById('tablaHistorialCuerpo').closest('.table-responsive').classList.add('d-none');
+  document.getElementById('historialVacio').classList.add('d-none');
+  
+  modalBS.show();
+
+  // 2. Llamada al servidor (Google Apps Script)
+  google.script.run
+    .withSuccessHandler(function(datosRecibidos) {
+      document.getElementById('historialCargando').classList.add('d-none');
+      renderizarTablaHistorial(datosRecibidos, nombreCliente);
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('historialCargando').classList.add('d-none');
+      Swal.fire('Error', 'No se pudo obtener el historial', 'error');
+    })
+    .obtenerHistorialCliente(nombreCliente);
+}
+
+function renderizarTablaHistorial(datos, nombre) {
+  const cuerpo = document.getElementById('tablaHistorialCuerpo');
+  const divVacio = document.getElementById('historialVacio');
+  const tablaContenedor = cuerpo.closest('.table-responsive');
+
+  cuerpo.innerHTML = ""; 
+
+  if (!Array.isArray(datos) || datos.length === 0) {
+    divVacio.classList.remove('d-none');
+    tablaContenedor.classList.add('d-none');
+    return;
+  }
+
+  divVacio.classList.add('d-none');
+  tablaContenedor.classList.remove('d-none');
+
+  datos.forEach(reg => {
+    const fila = `
+      <tr>
+        <td class="ps-3">
+          <strong>${reg.fecha}</strong><br>
+          <small class="text-muted">${reg.idOatc}</small>
+        </td>
+        <td>
+          <div class="fw-bold">${reg.tipoAtencion}</div>
+          <small class="badge bg-light text-dark border">${reg.tipoCliente}</small>
+        </td>
+        <td>${reg.agente}</td>
+        <td>
+          <div class="small">In: ${reg.horaInicio}</div>
+          <div class="small text-muted">Fin: ${reg.horaFin || '--:--'}</div>
+        </td>
+      </tr>`;
+    cuerpo.insertAdjacentHTML('beforeend', fila);
+  });
+}
+</script>
+
+<script>
+/**
+ * --- GESTIÓN DE MODAL: REGISTRO DE CLIENTE ---
+ */
+let clienteModal; 
+
+document.addEventListener('DOMContentLoaded', (event) => {
+  const modalElement = document.getElementById('modalCliente');
+  if (modalElement) {
+    clienteModal = new bootstrap.Modal(modalElement); 
+  }
+});
+
+function abrirModalCliente() {
+    if (clienteModal) clienteModal.show(); 
+}
+
+function cerrarModalCliente() {
+  if (clienteModal) clienteModal.hide(); 
+  
+  const campos = [
+    'nombreClienteModal', 'apellidoClienteModal', 'dniClienteModal', 
+    'cumpleanosClienteModal', 'celularClienteModal', 'correoClienteModal'
+  ];
+  campos.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  const statusElement = document.getElementById('statusMessageModal');
+  if (statusElement) statusElement.textContent = '';
+}
+
+function onSuccessRegistroCliente(respuestaServidor) {
+  console.log("DEBUG(Cliente/ModalCliente): Registro exitoso.");
+  
+  cerrarModalCliente(); 
+
+  if (window.actualizarVistasPostAccion) {
+      window.actualizarVistasPostAccion(respuestaServidor, false);
+  } else {
+      if (typeof loadInfoDataListClientes === 'function') loadInfoDataListClientes();
+      Swal.fire({ icon: 'success', title: '¡Listo!', text: respuestaServidor, timer: 1500 });
+  }
+}
+
+function onFailureConexion(error) {
+  console.error("Error de Apps Script:", error.message, error);
+
+  const statusElement = document.getElementById('statusMessageModal');
+  if (error.message && error.message.includes("ERR_CONNECTION_CLOSED")) {
+    const msg = "⚠️ Error de Conexión. La conexión con el servidor de Google falló temporalmente. Por favor, inténtalo de nuevo.";
+    if (statusElement) statusElement.textContent = msg;
+    else alert(msg);
+  } else {
+    const msg = "❌ Error del Servidor: " + error.message + ". Contacta a soporte si persiste.";
+    if (statusElement) statusElement.textContent = msg;
+    else alert(msg);
+  }
+}
+
+function guardarCliente() {
+  const nombre = document.getElementById('nombreClienteModal').value.trim();
+  const apellido = document.getElementById('apellidoClienteModal').value.trim();
+  const dni = document.getElementById('dniClienteModal').value.trim();
+  const cumpleanos = document.getElementById('cumpleanosClienteModal').value; 
+  const celular = document.getElementById('celularClienteModal').value.trim();
+  const correo = document.getElementById('correoClienteModal').value.trim();
+  
+  const statusElement = document.getElementById('statusMessageModal');
+  
+  if (!nombre || !apellido) {
+    if (statusElement) statusElement.textContent = 'Nombre y apellido son obligatorios.';
+    Swal.fire('Atención', 'Nombre y apellido son requeridos.', 'warning');
+    return;
+  }
+  
+  const datosCliente = { nombre, apellido, dni, cumpleanos, celular, correo };
+  
+  if (window.mostrarSpinner) window.mostrarSpinner();
+  
+  google.script.run
+    .withSuccessHandler(onSuccessRegistroCliente)
+    .withFailureHandler(window.onFailureConexion || ((err) => Swal.fire('Error', err.message, 'error')))      
+    .registrarClienteEnHoja(datosCliente); 
+}
+</script>
+
+<script>
+/**
+ * --- GESTIÓN DE MODAL: EDICIÓN DE CLIENTE EN OATC ---
+ */
+(function() {
+    
+    const ID_RESULTADOS_DIV = 'resultadosBusquedaClientes';
+    const ID_INPUT_CLIENTE = 'inputNuevoNombreCliente';
+    const ID_TITULO_MODAL = 'modalEdicionClienteTitulo';
+    const ID_MODAL_ELEMENT = 'modalEdicionCliente';
+    
+    let currentOatcIdToEdit = null;
+    let datosBusquedaClientesGlobal = []; 
+  
+    function filtrarListaClientes() {
+        const inputElement = document.getElementById(ID_INPUT_CLIENTE);
+        const resultadosDiv = document.getElementById(ID_RESULTADOS_DIV);
+        
+        if (!inputElement || !resultadosDiv) return;
+
+        const termino = inputElement.value.toLowerCase().trim();
+        resultadosDiv.innerHTML = ''; 
+
+        if (termino.length < 3) return; 
+
+        const resultados = datosBusquedaClientesGlobal.filter(cliente => {
+            const stringBusqueda = cliente.slice(0, 5).join(' ').toLowerCase();
+            return stringBusqueda.includes(termino);
+        });
+
+        const fragment = document.createDocumentFragment();
+        const resultadosLimitados = resultados.slice(0, 12);
+
+        if (resultadosLimitados.length === 0) {
+            const noRes = document.createElement('div');
+            noRes.className = 'list-group-item disabled text-muted';
+            noRes.textContent = 'No se encontraron coincidencias...';
+            fragment.appendChild(noRes);
+        } else {
+            resultadosLimitados.forEach(cliente => {
+                const nombreCompleto = `${cliente[0]} ${cliente[1]}`.trim();
+                const dni = cliente[2] || 'N/A';
+                const celular = cliente[4] || 'N/A';
+                
+                const cadenaFormateada = `${nombreCompleto} | DNI:${dni} | CEL:${celular}`;
+                
+                const item = document.createElement('a');
+                item.href = 'javascript:void(0)';
+                item.className = 'list-group-item list-group-item-action animate__animated animate__fadeIn';
+                
+                item.innerHTML = `
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">${nombreCompleto}</h6>
+                    </div>
+                    <small class="text-muted">DNI: ${dni} | Cel: ${celular}</small>
+                `;
+                
+                item.onclick = function(e) {
+                    e.preventDefault();
+                    inputElement.value = cadenaFormateada;
+                    resultadosDiv.innerHTML = ''; 
+                    console.log("DEBUG: Cliente formateado seleccionado:", cadenaFormateada);
+                };
+                fragment.appendChild(item);
+            });
+        }
+        resultadosDiv.appendChild(fragment);
+    }
+
+    function abrirModalEdicionCliente(oatcId) {
+        if (!oatcId) {
+            Swal.fire('Error', 'No se detectó un ID de orden válido.', 'error');
+            return;
+        }
+        currentOatcIdToEdit = oatcId;
+        if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+        
+        google.script.run
+            .withFailureHandler(function(err) {
+                if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+                window.onFailureConexion(err);
+            })
+            .withSuccessHandler(showModalWithOATCData)
+            .obtenerDatosOATCparaEdicionCliente(oatcId);
+    }
+
+    function showModalWithOATCData(datosOATC) {
+        if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+
+        const modalElement = document.getElementById(ID_MODAL_ELEMENT);
+        const inputCliente = document.getElementById(ID_INPUT_CLIENTE); 
+        const tituloModal = document.getElementById(ID_TITULO_MODAL);
+        
+        datosBusquedaClientesGlobal = datosOATC.listaClientes || [];
+        inputCliente.value = datosOATC.clienteNombre || '';
+        if (tituloModal) tituloModal.textContent = `Editar Cliente - OATC #${currentOatcIdToEdit}`;
+
+        const modalInstance = new bootstrap.Modal(modalElement);
+        modalInstance.show();
+
+        setTimeout(() => {
+            inputCliente.focus();
+            inputCliente.select();
+        }, 500);
+    }
+
+    function guardarEdicionCliente() {
+        if (!currentOatcIdToEdit) return;
+
+        const inputCliente = document.getElementById(ID_INPUT_CLIENTE);
+        const nuevoNombreFormateado = inputCliente ? inputCliente.value.trim() : '';
+
+        if (!nuevoNombreFormateado || nuevoNombreFormateado.length < 5) {
+            Swal.fire({ icon: 'warning', title: 'Dato insuficiente', text: 'Seleccione un cliente de la lista para asegurar el formato correcto.' });
+            return;
+        }
+
+        if (typeof window.mostrarSpinner === 'function') window.mostrarSpinner();
+
+        google.script.run
+            .withSuccessHandler(function(respuestaServidor) {
+                if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+                const modalEl = document.getElementById(ID_MODAL_ELEMENT);
+                const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if (modalInstance) modalInstance.hide();
+
+                Swal.fire({ icon: 'success', title: 'Cambio Guardado', text: 'El cliente ha sido actualizado con el formato de filtrado.', timer: 2500, showConfirmButton: false });
+
+                if (window.actualizarVistasPostAccion) window.actualizarVistasPostAccion();
+            })
+            .withFailureHandler(function(error) {
+                if (typeof window.ocultarSpinner === 'function') window.ocultarSpinner();
+                window.onFailureConexion(error);
+            })
+            .actualizarNombreClienteOATC(currentOatcIdToEdit, nuevoNombreFormateado);
+    }
+
+    window.abrirModalEdicionCliente = abrirModalEdicionCliente;
+    window.guardarEdicionCliente = guardarEdicionCliente;
+    window.filtrarListaClientes = filtrarListaClientes;
+
+})();
+</script>

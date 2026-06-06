@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <?!= include('onTopCSS'); ?>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/2.1.3/css/dataTables.bootstrap5.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  </head>
+  <body>
+    <div id="loading-overlay">
+      <div class="spinner-custom"></div>
+      <div class="loading-text">PROCESANDO...</div>
+    </div>
+
+    <!-- 🌟 NAVBAR PREMIUM UNIFICADO -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow">
+      <div class="container-fluid">
+        <a class="navbar-brand fw-bold text-uppercase" href="#"><i class="fas fa-scissors me-2 text-warning"></i>Antigravity Salon</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="?p=recepcion"><i class="fas fa-concierge-bell me-1"></i> Recepción</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="?p=caja"><i class="fas fa-cash-register me-1"></i> Caja</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link active" href="?p=insumos"><i class="fas fa-boxes me-1"></i> Despacho Insumos</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="?p=reportes"><i class="fas fa-chart-line me-1"></i> Reportes</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 🌐 CONTROLES DE ACCESIBILIDAD Y TEMA EN PARTE INFERIOR DERECHA -->
+    <div class="bottom-right-controls shadow d-flex align-items-center gap-2 bg-white p-2 px-3 border rounded-pill" 
+         style="position: fixed; bottom: 20px; right: 20px; z-index: 2000; transition: all 0.3s;">
+      <div onclick="cambiarTamanoFuente()" title="Cambiar tamaño de letra" style="cursor: pointer; display: inline-flex; align-items: center; gap: 4px; border-right: 1px solid #ccc; padding-right: 10px;">
+        <span style="font-size: 10px;">A</span>
+        <span style="font-size: 14px; font-weight: bold;">A</span>
+        <span style="font-size: 18px;">A</span>
+      </div>
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" role="switch" id="themeSwitch" onclick="toggleTheme()" style="cursor: pointer;">
+        <label class="form-check-label ms-1" for="themeSwitch" style="cursor: pointer; font-size: 12px; font-weight: bold;"><i class="fas fa-moon"></i></label>
+      </div>
+    </div>
+
+    <div class="container-fluid px-4">
+      <div class="row align-items-center mb-4 mt-3">
+        <div class="col-md-4"></div>
+        <div class="col-md-4 text-center">
+          <div id="my-clock" class="clock"></div>
+          <div id="date" class="date"></div>
+        </div>
+        <div class="col-md-4"></div>
+      </div>
+
+      <div class="row g-4">
+        <!-- SECCIÓN 1: LISTADO DE INSUMOS -->
+        <div class="col-md-6">
+          <div class="modern-card">
+            <h3 class="card-title-custom">Inventario de Insumos</h3>
+            <div class="p-3">
+              <form id="formNuevoInsumo" onsubmit="registrarNuevoInsumo(event)" class="mb-4 bg-light p-3 border rounded">
+                <h5 class="fw-bold mb-3"><i class="fas fa-plus-circle text-primary me-2"></i>Registrar Insumo</h5>
+                <div class="row g-2">
+                  <div class="col-md-6">
+                    <input type="text" class="form-control" id="insumoNombre" placeholder="Nombre del insumo" required>
+                  </div>
+                  <div class="col-md-6">
+                    <input type="text" class="form-control" id="insumoUnidad" placeholder="Unidad de medida (ej. ml, g, u)" required>
+                  </div>
+                  <div class="col-md-6 mt-2">
+                    <input type="number" class="form-control" id="insumoStock" placeholder="Stock inicial" required>
+                  </div>
+                  <div class="col-md-6 mt-2">
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">Agregar</button>
+                  </div>
+                </div>
+              </form>
+
+              <table class="table table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th>Insumo</th>
+                    <th>Stock</th>
+                    <th>Unidad</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaInsumosBody">
+                  <tr>
+                    <td colspan="3" class="text-center text-muted">Cargando inventario...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 2: DESPACHO DE INSUMOS -->
+        <div class="col-md-6">
+          <div class="modern-card">
+            <h3 class="card-title-custom">Despacho de Insumos</h3>
+            <div class="p-3">
+              <form id="formDespacho" onsubmit="registrarDespacho(event)" class="mb-4 bg-light p-3 border rounded">
+                <h5 class="fw-bold mb-3"><i class="fas fa-shipping-fast text-success me-2"></i>Registrar Despacho</h5>
+                <div class="row g-2">
+                  <div class="col-md-12">
+                    <label class="form-label fw-bold">Seleccionar Insumo</label>
+                    <select class="form-select" id="despachoInsumoId" required>
+                      <option value="">Cargando insumos...</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6 mt-2">
+                    <label class="form-label fw-bold">Cantidad</label>
+                    <input type="number" class="form-control" id="despachoCantidad" min="1" required>
+                  </div>
+                  <div class="col-md-6 mt-2">
+                    <label class="form-label fw-bold">Destino / Notas</label>
+                    <input type="text" class="form-control" id="despachoNotas" placeholder="Notas o Destinatario" required>
+                  </div>
+                  <div class="col-12 mt-3 text-center">
+                    <button type="submit" class="btn btn-success fw-bold px-4">Completar Despacho</button>
+                  </div>
+                </div>
+              </form>
+
+              <h5 class="fw-bold mb-3"><i class="fas fa-history text-muted me-2"></i>Últimos Despachos</h5>
+              <table class="table table-sm table-striped">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Insumo</th>
+                    <th>Cant.</th>
+                    <th>Destino</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaDespachosBody">
+                  <tr>
+                    <td colspan="4" class="text-center text-muted">Cargando historial de despachos...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/2.1.3/js/dataTables.js"></script>
+    <script src="https://cdn.datatables.net/2.1.3/js/dataTables.bootstrap5.js"></script>
+    
+    <?!= include('relojJS.html'); ?>
+    <?!= include('gestionAccesibilidadJS'); ?>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        cargarInsumos();
+        cargarDespachos();
+      });
+
+      function cargarInsumos() {
+        google.script.run
+          .withSuccessHandler(function(insumos) {
+            const body = document.getElementById('tablaInsumosBody');
+            const select = document.getElementById('despachoInsumoId');
+            
+            if (!insumos || insumos.length === 0) {
+              body.innerHTML = '<tr><td colspan="3" class="text-center py-3 text-muted">No hay insumos registrados.</td></tr>';
+              select.innerHTML = '<option value="">No hay insumos disponibles</option>';
+              return;
+            }
+
+            body.innerHTML = insumos.map(ins => `
+              <tr>
+                <td class="fw-bold">${ins.nombre}</td>
+                <td><span class="badge ${ins.stock > 5 ? 'bg-success' : 'bg-danger'}">${ins.stock}</span></td>
+                <td>${ins.unidad_medida}</td>
+              </tr>
+            `).join('');
+
+            select.innerHTML = '<option value="">-- Seleccionar --</option>' + insumos.map(ins => `
+              <option value="${ins.id}">${ins.nombre} (${ins.stock} ${ins.unidad_medida} disponibles)</option>
+            `).join('');
+          })
+          .obtenerInsumosInventario();
+      }
+
+      function cargarDespachos() {
+        google.script.run
+          .withSuccessHandler(function(despachos) {
+            const body = document.getElementById('tablaDespachosBody');
+            if (!despachos || despachos.length === 0) {
+              body.innerHTML = '<tr><td colspan="4" class="text-center py-3 text-muted">No se registran despachos.</td></tr>';
+              return;
+            }
+
+            body.innerHTML = despachos.map(des => `
+              <tr>
+                <td>${new Date(des.fecha_despacho).toLocaleDateString('es-PE')}</td>
+                <td class="fw-bold">${des.insumo_nombre}</td>
+                <td>${des.cantidad}</td>
+                <td>${des.destino || des.notas || '-'}</td>
+              </tr>
+            `).join('');
+          })
+          .obtenerDespachosRecientes();
+      }
+
+      function registrarNuevoInsumo(e) {
+        e.preventDefault();
+        const payload = {
+          nombre: document.getElementById('insumoNombre').value,
+          unidad_medida: document.getElementById('insumoUnidad').value,
+          stock: parseInt(document.getElementById('insumoStock').value)
+        };
+
+        if (window.mostrarSpinner) window.mostrarSpinner("Guardando Insumo...");
+        google.script.run
+          .withSuccessHandler(function() {
+            if (window.ocultarSpinner) window.ocultarSpinner();
+            Swal.fire("Registrado", "El insumo ha sido ingresado correctamente.", "success");
+            document.getElementById('formNuevoInsumo').reset();
+            cargarInsumos();
+          })
+          .registrarInsumoServidor(payload);
+      }
+
+      function registrarDespacho(e) {
+        e.preventDefault();
+        const payload = {
+          insumo_id: parseInt(document.getElementById('despachoInsumoId').value),
+          cantidad: parseInt(document.getElementById('despachoCantidad').value),
+          destino: document.getElementById('despachoNotas').value
+        };
+
+        if (window.mostrarSpinner) window.mostrarSpinner("Procesando Despacho...");
+        google.script.run
+          .withSuccessHandler(function() {
+            if (window.ocultarSpinner) window.ocultarSpinner();
+            Swal.fire("Despachado", "El stock de insumo ha sido actualizado.", "success");
+            document.getElementById('formDespacho').reset();
+            cargarInsumos();
+            cargarDespachos();
+          })
+          .withFailureHandler(function(err) {
+            if (window.ocultarSpinner) window.ocultarSpinner();
+            Swal.fire("Error", err.message, "error");
+          })
+          .registrarDespachoServidor(payload);
+      }
+    </script>
+  </body>
+</html>

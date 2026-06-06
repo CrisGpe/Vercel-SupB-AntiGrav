@@ -1,0 +1,403 @@
+<script>
+/**
+ * GESTIÓN DE TABLA OATC (ÓRDENES DE ATENCIÓN) - VERSIÓN UNIFICADA
+ */
+var oatcDataTableInstance = null; 
+
+(function() {
+  // 💡 MANTENEMOS TUS ÍNDICES ORIGINALES (Verificados en tu código)
+  const L_INDEX_ID_OATC = 1; 
+  const L_INDEX_TIPO_OATC = 2; 
+  const L_INDEX_CLIENTE_NOMBRE = 4; 
+  const L_INDEX_TIPO_CLIENTE = 5; 
+  const L_INDEX_AGENTE_NOMBRE = 6; 
+  const L_INDEX_HORA_RESOLUCION = 7; 
+  const L_INDEX_INICIO_ESPERA = 9;  
+  const L_INDEX_FIN_ESPERA = 10;
+
+  // --- 1. MOTOR DE RENDERIZADO (BLINDADO) ---
+  function renderizarTablaOATC(registrosOATC) {
+    const tableBody = document.getElementById("ordenesATCTablaBody");
+    const template = document.getElementById("ordenesATCFilas");
+    const tablaCompleta = document.getElementById("ordenesATCTabla"); 
+    
+    if (!tableBody || !template || !tablaCompleta || !Array.isArray(registrosOATC)) return;
+
+    if (oatcDataTableInstance) {
+      oatcDataTableInstance.destroy(); 
+      oatcDataTableInstance = null;
+    }
+
+    tableBody.innerHTML = ''; 
+    const fragment = document.createDocumentFragment();
+
+    registrosOATC.forEach(registroOATC => {
+      const idOATC = registroOATC[L_INDEX_ID_OATC];
+      const horaRegistro = registroOATC[0];
+      const tipoOATCTexto = registroOATC[L_INDEX_TIPO_OATC]; 
+      const tipoClienteTexto = registroOATC[L_INDEX_TIPO_CLIENTE]; 
+      const agenteNombre = registroOATC[L_INDEX_AGENTE_NOMBRE] ? String(registroOATC[L_INDEX_AGENTE_NOMBRE]).trim() : ""; 
+      const horaResolucion = registroOATC[L_INDEX_HORA_RESOLUCION];
+      const inicioEspera = registroOATC[L_INDEX_INICIO_ESPERA] ? String(registroOATC[L_INDEX_INICIO_ESPERA]).trim() : "";
+      const finEspera = registroOATC[L_INDEX_FIN_ESPERA] ? String(registroOATC[L_INDEX_FIN_ESPERA]).trim() : "";
+      const correlativo = registroOATC[11];
+      const agenteEstadoTexto = registroOATC[12] ? String(registroOATC[12]).trim() : "";
+
+      const trClone = template.content.cloneNode(true);
+      const filaTR = trClone.querySelector("tr");
+      const accionesCell = trClone.querySelector(".ordenesATCAcciones");
+      accionesCell.innerHTML = ''; 
+        
+      const estaResuelta = (String(horaResolucion).trim() !== "");
+      const agenteVacio = (agenteNombre === ""); 
+      const esperaActiva = (inicioEspera !== "" && finEspera === "" && !estaResuelta);
+
+      const tipoClienteNormalizado = String(tipoClienteTexto).toLowerCase().replace(/í/g, 'i').trim();
+      const esCita = (tipoClienteNormalizado === 'cita');
+      const esProducto = (tipoClienteNormalizado === 'producto');
+
+      if (esCita && !estaResuelta) filaTR.classList.add('fila-cita-pendiente');
+      else if (esperaActiva) filaTR.classList.add('fila-en-espera');
+
+      // Formato de la Columna Ord. (Unificado y Consistente)
+      const idPrefijo = correlativo ? String(correlativo) : horaRegistro;
+      let ordText = "";
+      if (tipoClienteNormalizado === "cita") {
+        ordText = `${idPrefijo} (Cita)`;
+      } else if (tipoClienteNormalizado === "cliente") {
+        ordText = `${idPrefijo} (Cliente)`;
+      } else if (tipoClienteNormalizado === "turno") {
+        ordText = `${idPrefijo} (Turno)`;
+      } else if (tipoClienteNormalizado === "correccion" || tipoClienteNormalizado === "corrección") {
+        ordText = `${idPrefijo} (Corrección)`;
+      } else if (tipoClienteNormalizado === "turno niño" || tipoClienteNormalizado === "turnonino") {
+        ordText = `${idPrefijo} (Niño)`;
+      } else if (tipoClienteNormalizado === "turno caballero" || tipoClienteNormalizado === "turnocaballero") {
+        ordText = `${idPrefijo} (Caballero)`;
+      } else if (tipoClienteNormalizado === "producto") {
+        ordText = `${idPrefijo} (Venta)`;
+      } else {
+        ordText = `${idPrefijo}`;
+      }
+
+      trClone.querySelector(".ordenesATCID").textContent = ordText;
+      trClone.querySelector(".ordenesATCHora").textContent = horaRegistro;
+      const nameCell = trClone.querySelector(".ordenesATCCliente");
+      if (!estaResuelta) {
+        nameCell.innerHTML = `<span class="clickeable-cliente text-primary text-decoration-underline" style="cursor: pointer;" data-oatc-id="${idOATC}">${registroOATC[L_INDEX_CLIENTE_NOMBRE]}</span>`;
+      } else {
+        nameCell.textContent = registroOATC[L_INDEX_CLIENTE_NOMBRE];
+      }
+      
+      const tipoOATCCell = trClone.querySelector(".tipoOATC");
+      if (esperaActiva) {
+        tipoOATCCell.innerHTML = '<span class="badge bg-warning text-dark">🔴 EN ESPERA</span>';
+      } else {
+        tipoOATCCell.textContent = tipoOATCTexto;
+      }
+
+      trClone.querySelector(".ordenesATCAgente").textContent = agenteNombre;
+      const opcionesDropdown = generarDropdownOpciones(idOATC);
+
+      if (!estaResuelta) {
+        if (esperaActiva) {
+          accionesCell.innerHTML += `<button class="btn btn-warning btn-sm btnTerminarEsperaOATC me-1" data-oatc-id="${idOATC}">Terminar espera</button>`;
+        }
+        else if (esProducto) {
+          accionesCell.innerHTML += `<button class="btn btn-success btn-sm btnEnviarCaja me-1" data-oatc-id="${idOATC}" data-cliente="${registroOATC[L_INDEX_CLIENTE_NOMBRE]}" data-agente="${agenteNombre}"><i class="fas fa-paper-plane"></i></button>`;
+        }
+        else if (esCita) {
+          accionesCell.innerHTML += `<button class="btn btn-success btn-sm resolverOATC me-1" data-oatc-id="${idOATC}">Comenzar atención</button>`;
+        }
+        else if (agenteVacio) {
+          accionesCell.innerHTML += `<button class="btn btn-outline-primary btn-sm asignarActivarModalBtn me-1" data-oatc-id="${idOATC}"> + Agente</button>`;
+        }
+        else if (agenteEstadoTexto === "Asesorando") {
+          if (tipoClienteNormalizado === 'cliente') {
+            accionesCell.innerHTML += `<button class="btn btn-success btn-sm btnAtenderOATC me-1" data-oatc-id="${idOATC}" data-accion="cliente">Atender cliente</button>`;
+          } else if (tipoClienteNormalizado === 'turno') {
+            accionesCell.innerHTML += `<button class="btn btn-success btn-sm btnAtenderOATC me-1" data-oatc-id="${idOATC}" data-accion="turno">Atender turno</button>`;
+          } else {
+            accionesCell.innerHTML += `<button class="btn btn-success btn-sm btnAtenderOATC me-1" data-oatc-id="${idOATC}" data-accion="otro">Comenzar atención</button>`;
+          }
+        }
+        else {
+          accionesCell.innerHTML += `<button class="btn btn-success btn-sm resolverOATC me-1" data-oatc-id="${idOATC}">Terminar atención</button>`;
+        }
+
+        // Papelera de reciclaje / basura para eliminar (siempre visible para órdenes no resueltas)
+        accionesCell.innerHTML += `<button class="btn btn-link btn-sm eliminarOATC text-danger p-1 me-1" data-oatc-id="${idOATC}" onclick="event.preventDefault(); event.stopPropagation(); window.abrirModalEliminarOATC('${idOATC}');"><i class="fas fa-trash-alt"></i></button>`;
+        
+        if (!esperaActiva) {
+          accionesCell.innerHTML += opcionesDropdown;
+        }
+      } else {
+        accionesCell.innerHTML += `<button class="btn btn-outline-info btn-sm btnAbrirNotasOATC me-1" data-oatc-id="${idOATC}"><i class="fas fa-edit"></i> Notas</button>`;
+        accionesCell.innerHTML += `<button class="btn btn-warning btn-sm reiniciarOATC me-1" data-oatc-id="${idOATC}">Reiniciar</button>`;
+      }
+        
+      fragment.appendChild(trClone);
+    });
+
+    tableBody.appendChild(fragment);
+
+    oatcDataTableInstance = new DataTable(tablaCompleta, {
+        searching: false, paging: false, info: false, order: [[0, 'asc']], 
+        language: { url: 'https://cdn.datatables.net/plug-ins/2.1.3/i18n/es-ES.json' }
+    });
+    tablaCompleta.removeEventListener('click', window.handleOATCMultiClick);
+    tablaCompleta.addEventListener('click', window.handleOATCMultiClick);
+  }
+
+  // --- 2. FUNCIONES DE LLAMADA AL SERVIDOR ---
+  
+  function ejecutarAccionOATC(metodo, filtroLabel) {
+    if (filtroLabel) window.filtroOATCActivo = filtroLabel;
+    if (window.mostrarCargando) window.mostrarCargando();
+    google.script.run
+      .withSuccessHandler(res => {
+        renderizarTablaOATC(res);
+        if (window.ocultarCargando) window.ocultarCargando();
+      })
+      .withFailureHandler(window.onFailureConexion)
+      [metodo]();
+  }
+
+  window.filtrarViewCitasRegistradas = () => ejecutarAccionOATC('obtenerCitasRegistradasEnAdelante', 'Citas Registradas');
+  window.filtrarViewOATCPendientes = () => ejecutarAccionOATC('obtenerOATCPendientes', 'Pendientes');
+  window.filtrarViewOATCResueltas = () => ejecutarAccionOATC('obtenerOATCResueltas', 'Resueltas');
+  window.filtrarViewTodas = () => ejecutarAccionOATC('obtenerOATCRegistradasTodas', 'Todas');
+
+  // --- 3. ACCIONES ESPECÍFICAS ---
+  window.llamarServidorPonerEnEspera = function(oatcId) {
+    google.script.run
+      .withSuccessHandler(res => { if (window.actualizarVistasPostAccion) window.actualizarVistasPostAccion(res); })
+      .withFailureHandler(window.onFailureConexion)
+      .ponerEnEsperaOATC(oatcId);
+  };
+
+  window.llamarServidorActivarOATC = function(oatcId) {
+    if (confirm(`¿Confirma que desea activar la OATC ${oatcId}?`)) {
+      google.script.run
+        .withSuccessHandler(window.actualizarVistasPostAccion)
+        .withFailureHandler(window.onFailureConexion)
+        .activarOATC(oatcId);
+    }
+  };
+
+  // --- 4. HELPERS ---
+  function generarDropdownOpciones(idOATC) {
+    return `
+      <div class="dropdown d-inline-block">
+        <button class="btn btn-sm btn-warning dropdown-toggle p-1 ms-1" type="button" data-bs-toggle="dropdown">
+          <span style="font-size: 1.2em;">⋮</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item ponerEnEsperaOATC" data-oatc-id="${idOATC}">Iniciar espera</a></li>
+        </ul>
+      </div>`;
+  }
+
+  // El manejador de clicks delegados (handleOATCMultiClick) se mantiene igual pero se expone
+  window.handleOATCMultiClick = function(event) {
+    // 1. Capturamos el link para frenar la navegación por defecto (evita página en blanco)
+    const link = event.target.closest('a');
+    if (link) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    // 2. Buscamos el elemento que contiene el ID (el "contenedor" de la acción)
+    const target = event.target.closest('[data-oatc-id]');
+    if (!target) return; // Si el clic no fue en nada con ID, ignoramos
+
+    const rawId = target.getAttribute('data-oatc-id');
+    const oatcId = String(rawId).split(' ')[0].trim();
+    const row = target.closest('tr');
+    const agenteNombre = row?.querySelector(".ordenesATCAgente")?.textContent?.trim() || "";
+
+    // --- LÓGICA DE MODALES Y ACCIONES ---
+
+    // A. ELIMINAR (Prioridad por ser acción destructiva)
+    if (target.matches(".eliminarOATC")) {
+      console.log("Intentando eliminar ID:", oatcId);
+      if (window.abrirModalEliminarOATC) {
+        window.abrirModalEliminarOATC(oatcId);
+      } else {
+        console.error("Función abrirModalEliminarOATC no encontrada.");
+      }
+    } 
+
+    // B. ASIGNAR AGENTE
+    else if (target.matches(".asignarActivarModalBtn")) {
+      window.abrirModalAsignacionAgente?.(oatcId);
+    } 
+
+    // C. EDICIÓN DE CLIENTE (Dropdown y Nombre Clickeable)
+    else if (target.matches(".editarClienteOATC") || target.matches(".clickeable-cliente")) {
+      console.log("Abriendo edición de cliente para:", oatcId);
+      if (window.abrirModalEdicionCliente) {
+        window.abrirModalEdicionCliente(oatcId);
+      } else {
+        console.error("La función abrirModalEdicionCliente no existe.");
+      }
+    } 
+
+    // D. EDICIÓN TIPO ATENCIÓN (Dropdown)
+    else if (target.matches(".editarTipoAtencionOATC")) {
+      window.abrirModalEdicionTipoAtencion?.(oatcId);
+    }
+
+    // E. ENVIAR A CAJA (Extrae datos adicionales del dataset)
+    else if (target.matches(".btnEnviarCaja")) {
+      const datosParaCaja = {
+        id: oatcId,
+        cliente: target.getAttribute('data-cliente') || "No definido",
+        agente: target.getAttribute('data-agente') || "No definido"
+      };
+      
+      if (typeof window.abrirModalVentaCaja === 'function') {
+        window.abrirModalVentaCaja(datosParaCaja);
+      } else {
+        console.error("abrirModalVentaCaja no disponible.");
+      }
+    }
+
+    // F. NOTAS DE ATENCIÓN
+    else if (target.matches(".btnAbrirNotasOATC")) {
+      console.log("Abriendo notas para ID limpio:", oatcId);
+      if (window.prepararYAbrirModalNotas) {
+        window.prepararYAbrirModalNotas(oatcId);
+      }
+    }
+
+    // G. PONER EN ESPERA (Dropdown)
+    else if (target.matches(".ponerEnEsperaOATC")) {
+      // Usamos Swal en lugar de confirm nativo para mantener la estética
+      Swal.fire({
+        title: '¿Iniciar espera?',
+        text: `La orden ${oatcId} pasará a estado de espera.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, iniciar espera'
+      }).then((result) => {
+        if (result.isConfirmed && window.llamarServidorPonerEnEspera) {
+          window.llamarServidorPonerEnEspera(oatcId);
+        }
+      });
+    }
+
+    else if (target.matches(".btnTerminarEsperaOATC")) {
+      Swal.fire({
+        title: '¿Terminar espera?',
+        text: `Se calculará el tiempo de espera y se iniciará la atención.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, terminar espera'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          if (window.mostrarCargando) window.mostrarCargando();
+          google.script.run
+            .withSuccessHandler(res => { if (window.actualizarVistasPostAccion) window.actualizarVistasPostAccion(res); })
+            .withFailureHandler(window.onFailureConexion)
+            .terminarEsperaOATC(oatcId);
+        }
+      });
+    }
+
+    else if (target.matches(".btnAtenderOATC")) {
+      const accion = target.getAttribute('data-accion');
+      let msg = "¿Comenzar la atención?";
+      if (accion === 'cliente') msg = "¿Iniciar 'Atender cliente'?";
+      else if (accion === 'turno') msg = "¿Iniciar 'Atender turno'?";
+      
+      Swal.fire({
+        title: msg,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, iniciar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          if (window.mostrarCargando) window.mostrarCargando();
+          google.script.run
+            .withSuccessHandler(res => { if (window.actualizarVistasPostAccion) window.actualizarVistasPostAccion(res); })
+            .withFailureHandler(window.onFailureConexion)
+            .iniciarAtencionOATC(oatcId, agenteNombre);
+        }
+      });
+    }
+  };
+
+  window.renderizarTablaOATC = renderizarTablaOATC;
+
+})();
+/**
+ * Prepara el modal de notas limpiando los campos y asignando el ID
+ */
+window.prepararYAbrirModalNotas = function(oatcId) {
+  // 1. Asignar el ID de la orden al campo oculto
+  document.getElementById('notaOatcId').value = oatcId;
+  
+  // 2. Limpiar campos para nueva entrada
+  document.getElementById('notaMonto').value = "";
+  document.getElementById('notaTexto').value = "";
+  
+  // 3. Mostrar el modal
+  const modalElement = document.getElementById('modalNotasOATC');
+  const modalInstance = bootstrap.Modal.getOrCreateInstance(modalElement);
+  modalInstance.show();
+
+  // 4. UX: Foco automático en el monto para empezar a escribir de inmediato
+  modalElement.addEventListener('shown.bs.modal', function () {
+      const inputMonto = document.getElementById('notaMonto');
+      inputMonto.focus();
+      // Opcional: Si quieres que aparezca "0.00" por defecto
+      // inputMonto.value = "0.00"; 
+  }, { once: true }); 
+};
+
+/**
+ * Envía los datos de notas y monto al servidor (Hoja Borrador)
+ */
+window.guardarNotasServidor = function() {
+  // 1. Rescatamos el ID que "prepararYAbrirModalNotas" guardó en el input oculto
+  const id = document.getElementById('notaOatcId').value; 
+  const monto = document.getElementById('notaMonto').value;
+  const notas = document.getElementById('notaTexto').value;
+
+  // Validación de seguridad
+  if (!id) {
+    Swal.fire('Error', 'No se encontró el ID de la OATC. Intente abrir el modal de nuevo.', 'error');
+    return;
+  }
+
+  if (window.mostrarCargando) window.mostrarCargando();
+
+  google.script.run
+    .withSuccessHandler(res => {
+      if (window.ocultarCargando) window.ocultarCargando();
+      
+      if (res.success) {
+        Swal.fire({
+          icon: 'success',
+          title: '¡Guardado!',
+          text: 'Detalles registrados en Borrador.',
+          timer: 1500,
+          showConfirmButton: false
+        });
+        
+        // Cerrar el modal correctamente
+        const modalElement = document.getElementById('modalNotasOATC');
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        if (modalInstance) modalInstance.hide();
+      } else {
+        Swal.fire('Error', res.error, 'error');
+      }
+    })
+    .withFailureHandler(err => {
+      if (window.ocultarCargando) window.ocultarCargando();
+      Swal.fire('Error Crítico', 'Error de conexión con el servidor', 'error');
+    })
+    .guardarDetalleNotas(id, monto, notas);
+};
+</script>

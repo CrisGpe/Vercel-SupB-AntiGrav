@@ -1,0 +1,70 @@
+<script>
+function buscarHistorialServidor(nombreCliente) {
+  if (!nombreCliente) {
+    Swal.fire('Atención', 'Seleccione un cliente primero', 'warning');
+    return;
+  }
+
+  // 1. Mostrar estado de carga en el modal y abrirlo
+  const modalElem = document.getElementById('modalHistorialCliente');
+  const modalBS = new bootstrap.Modal(modalElem);
+  
+  document.getElementById('historialNombreCliente').innerText = nombreCliente;
+  document.getElementById('historialCargando').classList.remove('d-none');
+  document.getElementById('tablaHistorialCuerpo').closest('.table-responsive').classList.add('d-none');
+  document.getElementById('historialVacio').classList.add('d-none');
+  
+  modalBS.show();
+
+  // 2. Llamada al servidor (Google Apps Script)
+  google.script.run
+    .withSuccessHandler(function(datosRecibidos) {
+      document.getElementById('historialCargando').classList.add('d-none');
+      // Ahora sí llamamos a tu función de dibujado con los parámetros correctos
+      renderizarTablaHistorial(datosRecibidos, nombreCliente);
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('historialCargando').classList.add('d-none');
+      Swal.fire('Error', 'No se pudo obtener el historial', 'error');
+    })
+    .obtenerHistorialCliente(nombreCliente); // Llama a tu función .gs
+}
+
+// Esta es tu función abrirHistorial corregida y renombrada para mayor claridad
+function renderizarTablaHistorial(datos, nombre) {
+  const cuerpo = document.getElementById('tablaHistorialCuerpo');
+  const divVacio = document.getElementById('historialVacio');
+  const tablaContenedor = cuerpo.closest('.table-responsive');
+
+  cuerpo.innerHTML = ""; 
+
+  if (!Array.isArray(datos) || datos.length === 0) {
+    divVacio.classList.remove('d-none');
+    tablaContenedor.classList.add('d-none');
+    return;
+  }
+
+  divVacio.classList.add('d-none');
+  tablaContenedor.classList.remove('d-none');
+
+  datos.forEach(reg => {
+    const fila = `
+      <tr>
+        <td class="ps-3">
+          <strong>${reg.fecha}</strong><br>
+          <small class="text-muted">${reg.idOatc}</small>
+        </td>
+        <td>
+          <div class="fw-bold">${reg.tipoAtencion}</div>
+          <small class="badge bg-light text-dark border">${reg.tipoCliente}</small>
+        </td>
+        <td>${reg.agente}</td>
+        <td>
+          <div class="small">In: ${reg.horaInicio}</div>
+          <div class="small text-muted">Fin: ${reg.horaFin || '--:--'}</div>
+        </td>
+      </tr>`;
+    cuerpo.insertAdjacentHTML('beforeend', fila);
+  });
+}
+</script>

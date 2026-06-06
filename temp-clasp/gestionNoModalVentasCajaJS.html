@@ -1,0 +1,253 @@
+<script>
+/**
+ * --- MÓDULO DE GESTIÓN DE VENTAS A CAJA (ESTÁTICO) ---
+ */
+
+// Variables de estado del módulo (ámbito global del script)
+let PRODUCTOS_BBDD = [];
+let CARRITO = [];
+let modalVentaCaja = null;
+
+/**
+ * Renderiza los productos agregados en la tabla del modal.
+ */
+function renderizarCarrito() {
+  const tbody = document.getElementById('contenedorCarrito');
+  if (!tbody) return;
+
+  if (CARRITO.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted small py-3">El carrito está vacío</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = CARRITO.map((item, index) => `
+    <tr class="align-middle">
+      <td class="py-2">
+        <div class="fw-bold" style="font-size: 0.85rem; line-height: 1.1;">${item.nombre}</div>
+        <div class="text-muted" style="font-size: 0.7rem;">${item.marca} | ${item.linea}</div>
+      </td>
+      <td style="width: 120px;">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text p-1" style="font-size: 0.7rem;">S/</span>
+          <input type="number" class="form-control form-control-sm fw-bold p-1 text-end" 
+                 value="${item.precio.toFixed(2)}" 
+                 step="0.50"
+                 onchange="window.actualizarPrecioCarrito(${index}, this.value)">
+        </div>
+      </td>
+      <td class="text-center">
+        <button class="btn btn-sm btn-outline-danger border-0" onclick="eliminarDelCarrito(${index})">
+          <i class="fas fa-times"></i>
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+/**
+ * Permite editar el precio directamente en la tabla.
+ */
+window.actualizarPrecioCarrito = function(index, nuevoPrecio) {
+  const valor = parseFloat(nuevoPrecio);
+  if (!isNaN(valor) && valor >= 0) {
+    CARRITO[index].precio = valor;
+  } else {
+    renderizarCarrito(); // Revierte si el valor es inválido
+  }
+};
+/**
+ * Elimina un producto del carrito y refresca la vista.
+ */
+window.eliminarDelCarrito = function(index) {
+  CARRITO.splice(index, 1);
+  renderizarCarrito();
+};
+
+/**
+ * Filtra y muestra los productos en la lista desplegable de búsqueda.
+ */
+function filtrarProductos() {
+  const input = document.getElementById('buscarProductoCaja');
+  const lista = document.getElementById('listaBusquedaProductos');
+  if (!input || !lista) return;
+
+  // Validación de seguridad: evitamos procesar si el valor es nulo
+  const busqueda = (input.value || "").trim().toLowerCase();
+  
+  if (busqueda.length < 2) {
+    lista.innerHTML = '';
+    return;
+  }
+
+  const sugerencias = PRODUCTOS_BBDD.filter(p => {
+    // Convertimos a String y validamos existencia para evitar errores de undefined
+    const nombre = String(p.nombre || "").toLowerCase();
+    const marca = String(p.marca || "").toLowerCase();
+    const linea = String(p.linea || "").toLowerCase();
+    return nombre.includes(busqueda) || marca.includes(busqueda) || linea.includes(busqueda);
+  }).slice(0, 6);
+
+  if (sugerencias.length === 0) {
+    lista.innerHTML = '<div class="list-group-item text-muted small">No hay resultados</div>';
+    return;
+  }
+
+  lista.innerHTML = sugerencias.map(p => {
+    // Aseguramos que los valores numéricos existan antes de usar toFixed
+    const precioVenta = parseFloat(p.precio) || 0;
+    const precioMin = parseFloat(p.precioMinimo) || 0;
+
+    return `
+      <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2" 
+              onclick="agregarAlCarrito('${p.nombre.replace(/'/g, "\\'")}', ${precioVenta}, '${p.marca}', '${p.linea}')">
+        <div class="text-start">
+          <div class="fw-bold" style="font-size: 0.9rem;">${p.nombre}</div>
+          <small class="text-muted">${p.marca} - ${p.linea}</small>
+        </div>
+        <div class="text-end">
+          <span class="badge bg-success rounded-pill d-block mb-1">S/ ${precioVenta.toFixed(2)}</span>
+          <span class="badge bg-info text-dark rounded-pill" style="font-size: 0.7rem;">Mín: S/ ${precioMin.toFixed(2)}</span>
+        </div>
+      </button>
+    `;
+  }).join('');
+}
+
+/**
+ * Agrega un producto al carrito.
+ */
+window.agregarAlCarrito = function(nombre, precio, marca, linea) {
+  // En este carrito cada clic agrega una fila nueva (permite vender 2 del mismo a distinto precio si se desea)
+  CARRITO.push({ nombre, precio, marca, linea });
+  const inputBusq = document.getElementById('buscarProductoCaja');
+  inputBusq.value = '';
+  inputBusq.focus();
+  document.getElementById('listaBusquedaProductos').innerHTML = '';
+  renderizarCarrito();
+};
+
+/**
+ * Abre el modal y prepara la interfaz.
+ */
+async function abrirModalVentaCaja(datosOATC) {
+  const modalElem = document.getElementById('modalVentaCaja');
+  const contenedorInfo = document.getElementById('infoClienteCaja');
+
+  if (!modalElem) return;
+
+  modalVentaCaja = bootstrap.Modal.getOrCreateInstance(modalElem);
+  modalElem.dataset.idOatc = datosOATC.id;
+  modalElem.dataset.cliente = datosOATC.cliente;
+  modalElem.dataset.agente = datosOATC.agente;
+
+  contenedorInfo.innerHTML = `
+    <div class="row align-items-center">
+      <div class="col-8">
+        <div class="small text-uppercase text-muted" style="font-size: 0.7rem;">Cliente</div>
+        <div class="fw-bold text-truncate">${datosOATC.cliente}</div>
+      </div>
+      <div class="col-4 text-end border-start">
+        <div class="small text-uppercase text-muted" style="font-size: 0.7rem;">OATC</div>
+        <div class="fw-bold text-success">#${datosOATC.id}</div>
+      </div>
+    </div>`;
+
+  if (PRODUCTOS_BBDD.length === 0) {
+    if (window.mostrarSpinner) window.mostrarSpinner();
+    try {
+      PRODUCTOS_BBDD = await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .obtenerListaProductosVenta();
+      });
+    } catch(e) { 
+      console.error("Error cargando productos:", e);
+      Swal.fire("Error", "No se pudo cargar la base de productos", "error");
+    }
+    if (window.ocultarSpinner) window.ocultarSpinner();
+  }
+
+  CARRITO = [];
+  renderizarCarrito();
+  
+  const inputBusq = document.getElementById('buscarProductoCaja');
+  inputBusq.value = '';
+  inputBusq.oninput = filtrarProductos;
+
+  document.getElementById('btnFinalizarVenta').onclick = () => window.procesarEnvioCaja();
+
+  modalVentaCaja.show();
+}
+/**
+ * Envía el carrito al servidor y muestra el Ticket de éxito.
+ */
+window.procesarEnvioCaja = function() {
+  if (CARRITO.length === 0) {
+    Swal.fire("Carrito vacío", "Debes agregar al menos un producto.", "warning");
+    return;
+  }
+
+  const modalElem = document.getElementById('modalVentaCaja');
+  const idOatc = modalElem.dataset.idOatc;
+  const clienteFinal = modalElem.dataset.cliente;
+  const agenteFinal = modalElem.dataset.agente;
+
+  Swal.fire({
+    title: "¿Confirmar Envío?",
+    text: `Se registrará la venta para la OATC #${idOatc}`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#198754',
+    confirmButtonText: 'Sí, enviar a Caja'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      if (window.mostrarSpinner) window.mostrarSpinner();
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (window.ocultarSpinner) window.ocultarSpinner();
+          modalVentaCaja.hide();
+          actualizarVistasPostAccion(response.mensajeResolucion);
+          
+          Swal.fire({
+            title: '¡Venta Registrada!',
+            html: `Ticket Generado: <b>${response.ticket}</b><br>La venta ha sido enviada a caja con éxito.`,
+            icon: 'success',
+            confirmButtonText: 'Excelente'
+          });
+          
+          // Opcional: Recargar la tabla principal si tienes una función de refresh
+          if (window.cargarAtenciones) window.cargarAtenciones();
+        })
+        .withFailureHandler(function(err) {
+          if (window.ocultarSpinner) window.ocultarSpinner();
+          Swal.fire("Error de Red", err.message, "error");
+        })
+        .procesarVentaCajaServidor(idOatc, CARRITO, clienteFinal, agenteFinal);
+    }
+  });
+};
+/**
+ * Obtiene la lista de productos desde la hoja de cálculo.
+ * Asegúrate de que el nombre coincida exactamente con el del JS.
+ */
+function obtenerListaProductosVenta() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hoja = ss.getSheetByName("PRODUCTOS"); // <--- Verifica que tu hoja se llame así
+  const datos = hoja.getDataRange().getValues();
+  
+  // Asumiendo que: Col A = Nombre, Col B = Precio, Col C = Categoría
+  // Omitimos la cabecera con slice(1)
+  return datos.slice(1).map(fila => ({
+    nombre: fila[0],
+    precio: parseFloat(fila[1]) || 0,
+    categoria: fila[2] || "General"
+  }));
+}
+// EXPOSICIÓN AL OBJETO WINDOW
+window.abrirModalVentaCaja = abrirModalVentaCaja;
+window.filtrarProductos = filtrarProductos;
+window.renderizarCarrito = renderizarCarrito;
+window.obtenerListaProductosVenta = obtenerListaProductosVenta;
+
+</script>

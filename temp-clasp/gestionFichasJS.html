@@ -1,0 +1,131 @@
+<script>
+/**
+ * ==========================================================================
+ * GESTIÓN DE FICHAS (AGENTES) - Versión con Flujo de Refrigerio
+ * ==========================================================================
+ * Este archivo gestiona las acciones de asistencia y estados de los agentes.
+ */
+
+/**
+ * Ejecuta acciones simples que solo requieren una llamada al servidor.
+ */
+function ejecutarAccionFicha(metodoServidor, tituloExito = "¡Operación Exitosa!") {
+  const inputDependiente = document.getElementById('dependientesDatalistAsistencia');
+  const nombreFicha = inputDependiente ? inputDependiente.value : null;
+
+  if (!nombreFicha) {
+    Swal.fire({ icon: 'warning', title: 'Campo Requerido', text: 'Selecciona un agente.', confirmButtonColor: '#3085d6' });
+    return;
+  }
+
+  window.mostrarSpinner();
+
+  google.script.run
+    .withSuccessHandler(function(responseMessage) {
+      window.ocultarSpinner();
+      Swal.fire({
+        icon: 'success',
+        title: tituloExito,
+        text: responseMessage,
+        showConfirmButton: false,
+        timer: 2000
+      });
+
+      if (inputDependiente) inputDependiente.value = '';
+      
+      if (window.actualizarVistasPostAccion) {
+        window.actualizarVistasPostAccion(null, false);
+      }
+    })
+    .withFailureHandler(window.onFailureConexion)[metodoServidor](nombreFicha); 
+}
+
+/**
+ * Gestiona el proceso de "Pasar Voz" con consulta opcional de refrigerio.
+ * Implementa un flujo de doble llamada secuencial a GAS.
+ */
+function pasarVozFicha() {
+  const inputDependiente = document.getElementById('dependientesDatalistAsistencia');
+  const nombreFicha = inputDependiente ? inputDependiente.value : null;
+
+  if (!nombreFicha) {
+    Swal.fire({ icon: 'warning', title: 'Campo Requerido', text: 'Selecciona un agente.', confirmButtonColor: '#3085d6' });
+    return;
+  }
+
+  Swal.fire({
+    title: '¿Pasar la voz?',
+    text: "¿Desea registrar también el refrigerio (Inicio/Fin) para este agente?",
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#1abc9c',
+    cancelButtonColor: '#34495e',
+    confirmButtonText: 'Sí, registrar ambos',
+    cancelButtonText: 'No, solo pasar voz'
+  }).then((result) => {
+    if (result.isConfirmed || result.dismiss === Swal.DismissReason.cancel) {
+      window.mostrarSpinner();
+
+      if (result.isConfirmed) {
+        // CASO A: Refrigerio + Pasar Voz (Secuencial)
+        google.script.run
+          .withSuccessHandler(function(resRefrigerio) {
+            google.script.run
+              .withSuccessHandler(function(resPasarVoz) {
+                 finalizarProcesoFicha(`Ref: ${resRefrigerio}\nEstado: ${resPasarVoz}`);
+              })
+              .withFailureHandler(window.onFailureConexion)
+              .pasarVoz(nombreFicha);
+          })
+          .withFailureHandler(window.onFailureConexion)
+          .registrarTimestampRefrigerio(nombreFicha);
+
+      } else {
+        // CASO B: Solo Pasar Voz
+        google.script.run
+          .withSuccessHandler(function(responseMessage) {
+             finalizarProcesoFicha(responseMessage);
+          })
+          .withFailureHandler(window.onFailureConexion)
+          .pasarVoz(nombreFicha);
+      }
+    }
+  });
+}
+
+/**
+ * Función auxiliar para limpiar UI, ocultar spinner y refrescar tablas.
+ */
+function finalizarProcesoFicha(mensaje) {
+  window.ocultarSpinner();
+  const inputDependiente = document.getElementById('dependientesDatalistAsistencia');
+  if (inputDependiente) inputDependiente.value = '';
+
+  Swal.fire({
+    icon: 'success',
+    title: 'Operación Completada',
+    text: mensaje,
+    timer: 2000
+  });
+
+  if (window.actualizarVistasPostAccion) {
+    window.actualizarVistasPostAccion(null, false);
+  }
+}
+// --- Mapeo de Funciones de Interfaz ---
+function activarFicha() { ejecutarAccionFicha('registrarEntrada', 'Entrada Registrada'); }
+function desctivarFicha() { ejecutarAccionFicha('registrarSalida', 'Salida Registrada'); }
+function refrigerioFicha() { ejecutarAccionFicha('registrarRefrigerio', 'Gestión de Refrigerio'); }
+function psicologoFicha() { ejecutarAccionFicha('citaPsicologo', 'Cita con Psicólogo'); }
+function salioSalonFicha() { ejecutarAccionFicha('salioSalon', 'Salida de Salón'); }
+function pasarSalonFicha() { ejecutarAccionFicha('pasarSalon', 'Ingreso a Salón'); }
+
+// Exposición global
+window.activarFicha = activarFicha;
+window.desctivarFicha = desctivarFicha;
+window.refrigerioFicha = refrigerioFicha;
+window.psicologoFicha = psicologoFicha;
+window.pasarVozFicha = pasarVozFicha;
+window.salioSalonFicha = salioSalonFicha;
+window.pasarSalonFicha = pasarSalonFicha;
+</script>
