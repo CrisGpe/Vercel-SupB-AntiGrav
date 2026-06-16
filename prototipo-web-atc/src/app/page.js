@@ -49,18 +49,26 @@ export default function ReceptionDashboard() {
       
       // Fetch data
       const [
-        { data: agentesData }, 
-        { data: asistData }, 
-        { data: oatcsData },
-        { data: clientesData }
+        { data: rawAgentesData, error: errAgentes }, 
+        { data: asistData, error: errAsist }, 
+        { data: oatcsData, error: errOatc },
+        { data: clientesData, error: errClientes }
       ] = await Promise.all([
-        supabase.from('agentes').select('*').eq('estado', 'Activo'),
+        supabase.from('agentes').select('*'),
         supabase.from('control_asistencia').select('*').gte('created_at', startOfDay).lte('created_at', endOfDay),
         supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).order('correlativo', { ascending: false }),
         supabase.from('clientes').select('id, nombre, apellido, dni')
       ]);
 
-      if (agentesData) setAgentes(agentesData);
+      if (errAgentes || errAsist || errOatc || errClientes) {
+        console.error("Supabase Fetch Errors:", { errAgentes, errAsist, errOatc, errClientes });
+      }
+
+      if (rawAgentesData) {
+        // Filter in JS to avoid strict ENUM casing issues on Supabase side
+        const agentesActivos = rawAgentesData.filter(a => String(a.estado).toLowerCase() === 'activo');
+        setAgentes(agentesActivos);
+      }
       if (asistData) setAsistencias(asistData);
       if (oatcsData) {
         setOatcs(oatcsData);
