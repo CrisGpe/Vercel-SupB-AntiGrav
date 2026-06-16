@@ -41,7 +41,9 @@ export default function ReceptionDashboard() {
     if (!isAuthorized) return;
     const fetchData = async () => {
       setLoading(true);
-      const fechaHoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+      const fechaLima = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+      const startOfDay = `${fechaLima}T00:00:00-05:00`;
+      const endOfDay = `${fechaLima}T23:59:59-05:00`;
       
       // Fetch data
       const [
@@ -51,8 +53,8 @@ export default function ReceptionDashboard() {
         { data: clientesData }
       ] = await Promise.all([
         supabase.from('agentes').select('*').ilike('estado', 'activo'),
-        supabase.from('control_asistencia').select('*').eq('fecha', fechaHoy),
-        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').eq('fecha', fechaHoy).order('correlativo', { ascending: false }),
+        supabase.from('control_asistencia').select('*').gte('created_at', startOfDay).lte('created_at', endOfDay),
+        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).order('correlativo', { ascending: false }),
         supabase.from('clientes').select('id, nombre, apellido, dni')
       ]);
 
@@ -84,8 +86,7 @@ export default function ReceptionDashboard() {
       return;
     }
 
-    const fechaHoy = getLimaDate();
-    const horaAhora = getLimaTime();
+    const nowIso = new Date().toISOString();
     const asistenciaActual = asistencias.find(a => a.agente_id === agente.id);
 
     try {
@@ -95,7 +96,7 @@ export default function ReceptionDashboard() {
           return;
         }
         const { error } = await supabase.from('control_asistencia').insert({
-          agente_id: agente.id, fecha: fechaHoy, entrada: horaAhora, estado_texto: 'Disponible', ultima_act: new Date().toISOString()
+          agente_id: agente.id, entrada_at: nowIso, estado_texto: 'Disponible', ultima_act: nowIso
         });
         if (error) throw error;
         Swal.fire('¡Éxito!', 'Entrada registrada correctamente.', 'success');
@@ -106,7 +107,7 @@ export default function ReceptionDashboard() {
           return;
         }
         const { error } = await supabase.from('control_asistencia').update({
-          salida: horaAhora, estado_texto: 'Ausente', ultima_act: new Date().toISOString()
+          salida_at: nowIso, estado_texto: 'Ausente', ultima_act: nowIso
         }).eq('id', asistenciaActual.id);
         if (error) throw error;
         Swal.fire('¡Éxito!', 'Salida registrada correctamente.', 'success');
@@ -116,15 +117,15 @@ export default function ReceptionDashboard() {
           Swal.fire('Error', 'No hay entrada registrada.', 'error');
           return;
         }
-        if (!asistenciaActual.ref_inicio && !asistenciaActual.ref_termino) {
+        if (!asistenciaActual.ref_inicio_at && !asistenciaActual.ref_termino_at) {
           const { error } = await supabase.from('control_asistencia').update({
-            ref_inicio: horaAhora, estado_texto: 'En refrigerio'
+            ref_inicio_at: nowIso, estado_texto: 'En refrigerio', ultima_act: nowIso
           }).eq('id', asistenciaActual.id);
           if (error) throw error;
           Swal.fire('¡Éxito!', 'Inicio de refrigerio registrado.', 'success');
-        } else if (asistenciaActual.ref_inicio && !asistenciaActual.ref_termino) {
+        } else if (asistenciaActual.ref_inicio_at && !asistenciaActual.ref_termino_at) {
           const { error } = await supabase.from('control_asistencia').update({
-            ref_termino: horaAhora, estado_texto: 'Disponible'
+            ref_termino_at: nowIso, estado_texto: 'Disponible', ultima_act: nowIso
           }).eq('id', asistenciaActual.id);
           if (error) throw error;
           Swal.fire('¡Éxito!', 'Término de refrigerio registrado.', 'success');
@@ -153,13 +154,11 @@ export default function ReceptionDashboard() {
 
         const payload = {
           correlativo: parseInt(nextOatcNumber, 10),
-          fecha: fechaHoy,
-          hora: horaAhora,
+          creado_at: nowIso,
           cliente_id: clienteId,
-          tipo_atencion: atencionOatc,
+          tipo_oatc: atencionOatc,
           categoria_demanda: demandaOatc,
-          agente_id: agenteOatcObj.id,
-          hora_resuelto: ''
+          agente_id: agenteOatcObj.id
         };
 
         const { error } = await supabase.from('oatc').insert(payload);
@@ -178,9 +177,13 @@ export default function ReceptionDashboard() {
       }
 
       // Refetch data after success
+      const fechaLima = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+      const startOfDay = `${fechaLima}T00:00:00-05:00`;
+      const endOfDay = `${fechaLima}T23:59:59-05:00`;
+
       const [ { data: newAsist }, { data: newOatcs } ] = await Promise.all([
-        supabase.from('control_asistencia').select('*').eq('fecha', fechaHoy),
-        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').eq('fecha', fechaHoy).order('correlativo', { ascending: false })
+        supabase.from('control_asistencia').select('*').gte('created_at', startOfDay).lte('created_at', endOfDay),
+        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).order('correlativo', { ascending: false })
       ]);
       if (newAsist) setAsistencias(newAsist);
       if (newOatcs) {
@@ -348,8 +351,8 @@ export default function ReceptionDashboard() {
                     <tr key={asist.id} className="hover:bg-indigo-50 transition-colors cursor-pointer group" onClick={() => openAgentModal(a)}>
                       <td className="px-2 py-2 text-center font-mono font-bold text-indigo-600">-</td>
                       <td className="px-2 py-2 text-center font-mono font-bold text-sky-600">-</td>
-                      <td className="px-2 py-2 text-slate-500">{asist.entrada || '--:--'}</td>
-                      <td className="px-2 py-2 text-slate-500">{asist.salida || '--:--'}</td>
+                      <td className="px-2 py-2 text-slate-500">{asist.entrada_at ? new Date(asist.entrada_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</td>
+                      <td className="px-2 py-2 text-slate-500">{asist.salida_at ? new Date(asist.salida_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</td>
                       <td className="px-2 py-2 font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{a.nombre_completo || a.apodo}</td>
                       <td className="px-2 py-2">
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${asist.estado_texto === 'Disponible' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'}`}>
@@ -391,7 +394,7 @@ export default function ReceptionDashboard() {
                 {oatcs.length > 0 ? oatcs.map(o => (
                   <tr key={o.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-2 py-2 font-mono font-bold">{o.correlativo}</td>
-                    <td className="px-2 py-2 text-slate-500">{o.hora}</td>
+                    <td className="px-2 py-2 text-slate-500">{o.creado_at ? new Date(o.creado_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</td>
                     <td className="px-2 py-2 font-bold text-slate-800">
                       {o.clientes ? `${o.clientes.nombre} ${o.clientes.apellido}` : 'POR ASIGNAR'}
                     </td>

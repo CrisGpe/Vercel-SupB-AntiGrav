@@ -19,7 +19,11 @@ export default function DatosModal({ isOpen, onClose }) {
   const fetchOatcs = async (dateStr) => {
     setLoading(true);
     let query = supabase.from('oatc').select('*, agentes(nombre_completo), clientes(nombre, apellido)').order('correlativo', { ascending: false });
-    if (dateStr) query = query.eq('fecha', dateStr);
+    if (dateStr) {
+      const startOfDay = `${dateStr}T00:00:00-05:00`;
+      const endOfDay = `${dateStr}T23:59:59-05:00`;
+      query = query.gte('creado_at', startOfDay).lte('creado_at', endOfDay);
+    }
     
     const { data } = await query;
     setOatcs(data || []);
@@ -95,8 +99,8 @@ export default function DatosModal({ isOpen, onClose }) {
                   {oatcs.length > 0 ? oatcs.map(o => (
                     <tr key={o.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-4 py-3 font-mono font-bold text-slate-700">{o.correlativo}</td>
-                      <td className="px-4 py-3 text-slate-600 font-mono">{o.fecha}</td>
-                      <td className="px-4 py-3 text-slate-500">{o.hora}</td>
+                      <td className="px-4 py-3 text-slate-600 font-mono">{o.creado_at ? new Date(o.creado_at).toLocaleDateString('en-CA', { timeZone: 'America/Lima' }) : '--'}</td>
+                      <td className="px-4 py-3 text-slate-500">{o.creado_at ? new Date(o.creado_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '--'}</td>
                       <td className="px-4 py-3 font-bold text-slate-800">{o.clientes ? `${o.clientes.nombre} ${o.clientes.apellido}` : 'POR ASIGNAR'}</td>
                       <td className="px-4 py-3 text-slate-600">{o.agentes?.nombre_completo || '---'}</td>
                       <td className="px-4 py-3">
