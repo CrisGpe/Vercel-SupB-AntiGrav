@@ -21,32 +21,164 @@ export default function ReceptionDashboard() {
   const [showAgentModal, setShowAgentModal] = useState(false);
   const [selectedAgentData, setSelectedAgentData] = useState(null);
 
+  const [asistencias, setAsistencias] = useState([]);
+
+  const [clientes, setClientes] = useState([]);
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const { data: agentesData } = await supabase.from('agentes').select('*');
-      if (agentesData) setAgentes(agentesData);
+      const fechaHoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+      
+      // Fetch data
+      const [
+        { data: agentesData }, 
+        { data: asistData }, 
+        { data: oatcsData },
+        { data: clientesData }
+      ] = await Promise.all([
+        supabase.from('agentes').select('*').eq('estado', 'Activo'),
+        supabase.from('control_asistencia').select('*').eq('fecha', fechaHoy),
+        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').eq('fecha', fechaHoy).order('correlativo', { ascending: false }),
+        supabase.from('clientes').select('id, nombre, apellido, dni')
+      ]);
 
-      // Mock current OATC number (in reality fetch max(correlativo) + 1 for today)
-      setNextOatcNumber('42');
+      if (agentesData) setAgentes(agentesData);
+      if (asistData) setAsistencias(asistData);
+      if (oatcsData) {
+        setOatcs(oatcsData);
+        setNextOatcNumber(oatcsData.length > 0 ? (oatcsData[0].correlativo + 1).toString() : '1');
+      }
+      if (clientesData) setClientes(clientesData);
       
       setLoading(false);
     };
     fetchData();
   }, []);
 
+  const getLimaDate = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+  const getLimaTime = () => new Date().toLocaleTimeString('en-US', { timeZone: 'America/Lima', hour12: true, hour: 'numeric', minute: '2-digit' }).toLowerCase();
+
   const handleAction = async (actionName) => {
-    Swal.fire({
-      title: 'Operación Pendiente',
-      text: `La lógica para "${actionName}" se conectará en el siguiente paso.`,
-      icon: 'info',
-      confirmButtonColor: '#4f46e5',
-      confirmButtonText: 'Entendido',
-      customClass: {
-        popup: 'rounded-xl',
-        confirmButton: 'rounded-lg px-4 py-2 font-bold'
+    if (!agenteAsistencia) {
+      Swal.fire('Atención', 'Por favor selecciona un agente primero.', 'warning');
+      return;
+    }
+
+    const agente = agentes.find(a => a.nombre_completo === agenteAsistencia || a.apodo === agenteAsistencia);
+    if (!agente) {
+      Swal.fire('Error', 'Agente no encontrado en la base de datos.', 'error');
+      return;
+    }
+
+    const fechaHoy = getLimaDate();
+    const horaAhora = getLimaTime();
+    const asistenciaActual = asistencias.find(a => a.agente_id === agente.id);
+
+    try {
+      if (actionName === 'Registrar Entrada') {
+        if (asistenciaActual) {
+          Swal.fire('Información', 'El agente ya registró su entrada hoy.', 'info');
+          return;
+        }
+        const { error } = await supabase.from('control_asistencia').insert({
+          agente_id: agente.id, fecha: fechaHoy, entrada: horaAhora, estado_texto: 'Disponible', ultima_act: new Date().toISOString()
+        });
+        if (error) throw error;
+        Swal.fire('¡Éxito!', 'Entrada registrada correctamente.', 'success');
+      } 
+      else if (actionName === 'Registrar Salida') {
+        if (!asistenciaActual) {
+          Swal.fire('Error', 'No hay entrada registrada para hoy.', 'error');
+          return;
+        }
+        const { error } = await supabase.from('control_asistencia').update({
+          salida: horaAhora, estado_texto: 'Ausente', ultima_act: new Date().toISOString()
+        }).eq('id', asistenciaActual.id);
+        if (error) throw error;
+        Swal.fire('¡Éxito!', 'Salida registrada correctamente.', 'success');
       }
-    });
+      else if (actionName === 'Refrigerio') {
+        if (!asistenciaActual) {
+          Swal.fire('Error', 'No hay entrada registrada.', 'error');
+          return;
+        }
+        if (!asistenciaActual.ref_inicio && !asistenciaActual.ref_termino) {
+          const { error } = await supabase.from('control_asistencia').update({
+            ref_inicio: horaAhora, estado_texto: 'En refrigerio'
+          }).eq('id', asistenciaActual.id);
+          if (error) throw error;
+          Swal.fire('¡Éxito!', 'Inicio de refrigerio registrado.', 'success');
+        } else if (asistenciaActual.ref_inicio && !asistenciaActual.ref_termino) {
+          const { error } = await supabase.from('control_asistencia').update({
+            ref_termino: horaAhora, estado_texto: 'Disponible'
+          }).eq('id', asistenciaActual.id);
+          if (error) throw error;
+          Swal.fire('¡Éxito!', 'Término de refrigerio registrado.', 'success');
+        } else {
+          Swal.fire('Información', 'El refrigerio ya fue completado hoy.', 'info');
+          return;
+        }
+      }
+      else if (actionName === 'Registrar OATC') {
+        if (!demandaOatc || !agenteOatc || !atencionOatc) {
+          Swal.fire('Atención', 'Complete Demanda, Agente Disponible y Tipo de atención.', 'warning');
+          return;
+        }
+
+        const agenteOatcObj = agentes.find(a => a.nombre_completo === agenteOatc || a.apodo === agenteOatc);
+        if (!agenteOatcObj) {
+          Swal.fire('Error', 'Agente seleccionado para la OATC no existe.', 'error');
+          return;
+        }
+
+        let clienteId = null;
+        if (clienteOatc) {
+          const cli = clientes.find(c => `${c.nombre} ${c.apellido}`.toLowerCase().includes(clienteOatc.toLowerCase()) || c.dni === clienteOatc);
+          if (cli) clienteId = cli.id;
+        }
+
+        const payload = {
+          correlativo: parseInt(nextOatcNumber, 10),
+          fecha: fechaHoy,
+          hora: horaAhora,
+          cliente_id: clienteId,
+          tipo_atencion: atencionOatc,
+          categoria_demanda: demandaOatc,
+          agente_id: agenteOatcObj.id,
+          hora_resuelto: ''
+        };
+
+        const { error } = await supabase.from('oatc').insert(payload);
+        if (error) throw error;
+        
+        Swal.fire('¡Éxito!', `OATC N° ${nextOatcNumber} registrada.`, 'success');
+        setClienteOatc(''); setDemandaOatc(''); setAgenteOatc(''); setAtencionOatc('');
+      }
+      else {
+        Swal.fire({
+          title: 'Operación Pendiente',
+          text: `La lógica para "${actionName}" se conectará en el siguiente paso.`,
+          icon: 'info',
+          confirmButtonColor: '#4f46e5',
+        });
+      }
+
+      // Refetch data after success
+      const [ { data: newAsist }, { data: newOatcs } ] = await Promise.all([
+        supabase.from('control_asistencia').select('*').eq('fecha', fechaHoy),
+        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').eq('fecha', fechaHoy).order('correlativo', { ascending: false })
+      ]);
+      if (newAsist) setAsistencias(newAsist);
+      if (newOatcs) {
+        setOatcs(newOatcs);
+        setNextOatcNumber(newOatcs.length > 0 ? (newOatcs[0].correlativo + 1).toString() : '1');
+      }
+      setAgenteAsistencia(''); // clear input
+      
+    } catch (e) {
+      Swal.fire('Error', `Fallo al registrar: ${e.message}`, 'error');
+    }
   };
 
   const openAgentModal = (agente) => {
@@ -192,21 +324,30 @@ export default function ReceptionDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {agentes.slice(0, 5).map(a => (
-                  <tr key={a.id} className="hover:bg-indigo-50 transition-colors cursor-pointer group" onClick={() => openAgentModal(a)}>
-                    <td className="px-2 py-2 text-center font-mono font-bold text-indigo-600">3</td>
-                    <td className="px-2 py-2 text-center font-mono font-bold text-sky-600">1</td>
-                    <td className="px-2 py-2 text-slate-500">09:00 AM</td>
-                    <td className="px-2 py-2 text-slate-500">--:--</td>
-                    <td className="px-2 py-2 font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{a.nombre_completo || a.apodo}</td>
-                    <td className="px-2 py-2">
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        Disponible
-                      </span>
-                    </td>
-                    <td className="px-2 py-2 text-right text-slate-400 font-mono text-[10px]">10:15 AM</td>
-                  </tr>
-                ))}
+                {asistencias.map(asist => {
+                  const a = agentes.find(ag => ag.id === asist.agente_id);
+                  if (!a) return null;
+                  return (
+                    <tr key={asist.id} className="hover:bg-indigo-50 transition-colors cursor-pointer group" onClick={() => openAgentModal(a)}>
+                      <td className="px-2 py-2 text-center font-mono font-bold text-indigo-600">-</td>
+                      <td className="px-2 py-2 text-center font-mono font-bold text-sky-600">-</td>
+                      <td className="px-2 py-2 text-slate-500">{asist.entrada || '--:--'}</td>
+                      <td className="px-2 py-2 text-slate-500">{asist.salida || '--:--'}</td>
+                      <td className="px-2 py-2 font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{a.nombre_completo || a.apodo}</td>
+                      <td className="px-2 py-2">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${asist.estado_texto === 'Disponible' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'}`}>
+                          {asist.estado_texto}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2 text-right text-slate-400 font-mono text-[10px]">
+                        {asist.ultima_act ? new Date(asist.ultima_act).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {asistencias.length === 0 && (
+                  <tr><td colSpan="7" className="text-center py-4 text-slate-500">Ningún agente ha ingresado hoy.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -230,20 +371,36 @@ export default function ReceptionDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                <tr className="hover:bg-slate-50 transition-colors">
-                  <td className="px-2 py-2 font-mono font-bold">14</td>
-                  <td className="px-2 py-2 text-slate-500">10:05 AM</td>
-                  <td className="px-2 py-2 font-bold text-slate-800">Maria Perez</td>
-                  <td className="px-2 py-2"><span className="bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase">Color</span></td>
-                  <td className="px-2 py-2 text-slate-600">Juan</td>
-                  <td className="px-2 py-2 text-center">
-                    <div className="flex justify-center gap-1">
-                      <button className="px-2 py-1 bg-emerald-500 text-white rounded text-[10px] font-bold hover:bg-emerald-600">Resolver</button>
-                      <button className="px-2 py-1 bg-amber-500 text-white rounded text-[10px] font-bold hover:bg-amber-600">Espera</button>
-                      <button className="px-2 py-1 bg-red-500 text-white rounded text-[10px] font-bold hover:bg-red-600">X</button>
-                    </div>
-                  </td>
-                </tr>
+                {oatcs.length > 0 ? oatcs.map(o => (
+                  <tr key={o.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-2 py-2 font-mono font-bold">{o.correlativo}</td>
+                    <td className="px-2 py-2 text-slate-500">{o.hora}</td>
+                    <td className="px-2 py-2 font-bold text-slate-800">
+                      {o.clientes ? `${o.clientes.nombre} ${o.clientes.apellido}` : 'POR ASIGNAR'}
+                    </td>
+                    <td className="px-2 py-2">
+                      <span className="bg-sky-100 text-sky-800 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase">
+                        {o.categoria_demanda}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2 text-slate-600">
+                      {o.agentes ? (o.agentes.nombre_completo || o.agentes.apodo) : '--'}
+                    </td>
+                    <td className="px-2 py-2 text-center">
+                      <div className="flex justify-center gap-1">
+                        <button className="px-2 py-1 bg-emerald-500 text-white rounded text-[10px] font-bold hover:bg-emerald-600">Resolver</button>
+                        <button className="px-2 py-1 bg-amber-500 text-white rounded text-[10px] font-bold hover:bg-amber-600">Espera</button>
+                        <button className="px-2 py-1 bg-red-500 text-white rounded text-[10px] font-bold hover:bg-red-600">X</button>
+                      </div>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr className="hover:bg-slate-50 transition-colors">
+                    <td colSpan="6" className="px-4 py-8 text-center text-slate-500">
+                      No hay órdenes activas en este momento
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
