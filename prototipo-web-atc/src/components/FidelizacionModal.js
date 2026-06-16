@@ -136,7 +136,7 @@ export default function FidelizacionModal({ isOpen, onClose }) {
             <button onClick={() => setFiltroCampana('Kerastase')} className={`px-4 py-2 text-sm font-bold border-t border-b border-r border-slate-300 rounded-r-lg ${filtroCampana === 'Kerastase' ? 'bg-sky-500 text-white border-sky-500' : 'bg-white text-slate-700 hover:bg-slate-50'}`}>C. Kerastase</button>
           </div>
           <div className="w-full md:w-1/3">
-            <input type="text" placeholder="Buscar por Nombre, DNI o Celular..." value={search} onChange={e => setSearch(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-pink-500 outline-none" />
+            <input id="searchCliente" name="searchCliente" type="text" placeholder="Buscar por Nombre, DNI o Celular..." value={search} onChange={e => setSearch(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-pink-500 outline-none" />
           </div>
         </div>
 

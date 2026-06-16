@@ -89,16 +89,16 @@ export default function AgentesModal({ isOpen, onClose }) {
             <h4 className="font-bold text-slate-700 mb-4">{editId ? 'Editar Agente' : 'Nuevo Agente'}</h4>
             <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Nombre Completo</label>
-                <input type="text" value={nombre} onChange={e => setNombre(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none" placeholder="Ej. Juan Pérez" />
+                <label htmlFor="agenteNombre" className="block text-xs font-bold text-slate-500 mb-1">Nombre Completo</label>
+                <input id="agenteNombre" name="agenteNombre" type="text" value={nombre} onChange={e => setNombre(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none" placeholder="Ej. Juan Pérez" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Apodo (Pizarra)</label>
-                <input type="text" value={apodo} onChange={e => setApodo(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none" placeholder="Ej. Juan" />
+                <label htmlFor="agenteApodo" className="block text-xs font-bold text-slate-500 mb-1">Apodo (Pizarra)</label>
+                <input id="agenteApodo" name="agenteApodo" type="text" value={apodo} onChange={e => setApodo(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none" placeholder="Ej. Juan" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Estado</label>
-                <select value={estado} onChange={e => setEstado(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none">
+                <label htmlFor="agenteEstado" className="block text-xs font-bold text-slate-500 mb-1">Estado</label>
+                <select id="agenteEstado" name="agenteEstado" value={estado} onChange={e => setEstado(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none">
                   <option value="Activo">Activo</option>
                   <option value="Inactivo">Inactivo</option>
                 </select>

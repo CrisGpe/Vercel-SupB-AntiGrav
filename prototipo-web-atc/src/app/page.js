@@ -27,8 +27,10 @@ export default function ReceptionDashboard() {
   const [asistencias, setAsistencias] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const user = localStorage.getItem('currentUser');
     if (!user) {
       router.push('/login');
@@ -257,7 +259,7 @@ export default function ReceptionDashboard() {
             <h2 className="text-sm font-bold m-0 uppercase tracking-wide">Órdenes de atención</h2>
             <div className="flex gap-3 text-xs font-mono bg-slate-700 px-2 py-0.5 rounded">
               <span>N°: <span className="text-amber-400 font-bold">{nextOatcNumber}</span></span>
-              <span suppressHydrationWarning>Fecha: {new Date().toLocaleDateString('es-PE')}</span>
+              <span className="capitalize">{mounted ? `Fecha: ${new Date().toLocaleDateString('es-PE')}` : 'Fecha: ...'}</span>
             </div>
           </div>
           

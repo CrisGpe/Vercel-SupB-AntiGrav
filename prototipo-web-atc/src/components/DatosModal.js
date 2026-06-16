@@ -64,9 +64,8 @@ export default function DatosModal({ isOpen, onClose }) {
         {/* Filters */}
         <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center gap-4">
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Filtrar por Fecha</label>
-            <input 
-              type="date" 
+            <label htmlFor="datosFecha" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Filtrar por Fecha</label>
+            <input id="datosFecha" name="datosFecha" type="date" 
               value={dateFilter}
               onChange={handleDateChange}
               className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
