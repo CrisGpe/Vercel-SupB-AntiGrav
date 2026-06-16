@@ -65,9 +65,7 @@ export default function ReceptionDashboard() {
       }
 
       if (rawAgentesData) {
-        // Filter in JS to avoid strict ENUM casing issues on Supabase side
-        const agentesActivos = rawAgentesData.filter(a => String(a.estado).toLowerCase() === 'activo');
-        setAgentes(agentesActivos);
+        setAgentes(rawAgentesData);
       }
       if (asistData) setAsistencias(asistData);
       if (oatcsData) {
