@@ -67,10 +67,14 @@ export default function Navbar() {
                 <button className="px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 text-slate-900 transition-colors">
                   Recepción
                 </button>
-                <button className="px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                <button 
+                  onClick={() => Swal.fire('Módulo en desarrollo', 'La sección "Caja" estará disponible próximamente.', 'info')}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors">
                   Caja
                 </button>
-                <button className="px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                <button 
+                  onClick={() => Swal.fire('Módulo en desarrollo', 'La sección "Reportes" estará disponible próximamente.', 'info')}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors">
                   Reportes
                 </button>
               </div>

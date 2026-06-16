@@ -50,7 +50,7 @@ export default function ReceptionDashboard() {
         { data: oatcsData },
         { data: clientesData }
       ] = await Promise.all([
-        supabase.from('agentes').select('*').eq('estado', 'Activo'),
+        supabase.from('agentes').select('*').ilike('estado', 'activo'),
         supabase.from('control_asistencia').select('*').eq('fecha', fechaHoy),
         supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').eq('fecha', fechaHoy).order('correlativo', { ascending: false }),
         supabase.from('clientes').select('id, nombre, apellido, dni')
