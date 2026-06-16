@@ -1,10 +1,13 @@
 'use client';
-
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Swal from 'sweetalert2';
+import Navbar from '@/components/Navbar'; // Asumo que se usa aquí si se necesita, si no, se deja igual.
 
 export default function ReceptionDashboard() {
+  const router = useRouter();
+  
   const [agentes, setAgentes] = useState([]);
   const [oatcs, setOatcs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,10 +25,20 @@ export default function ReceptionDashboard() {
   const [selectedAgentData, setSelectedAgentData] = useState(null);
 
   const [asistencias, setAsistencias] = useState([]);
-
   const [clientes, setClientes] = useState([]);
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
+    const user = localStorage.getItem('currentUser');
+    if (!user) {
+      router.push('/login');
+    } else {
+      setIsAuthorized(true);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    if (!isAuthorized) return;
     const fetchData = async () => {
       setLoading(true);
       const fechaHoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
@@ -185,6 +198,10 @@ export default function ReceptionDashboard() {
     setSelectedAgentData(agente);
     setShowAgentModal(true);
   };
+
+  if (!isAuthorized) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><p className="text-slate-500">Verificando sesión...</p></div>;
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 p-2 font-sans">
