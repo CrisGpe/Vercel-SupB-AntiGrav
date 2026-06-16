@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Swal from 'sweetalert2';
 
 export default function Navbar() {
   const [time, setTime] = useState(new Date());
@@ -16,6 +17,16 @@ export default function Navbar() {
 
   const formatTime = (date) => {
     return date.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+
+  const handleNavAction = (actionName) => {
+    Swal.fire({
+      title: 'Módulo en desarrollo',
+      text: `El módulo "${actionName}" estará disponible próximamente.`,
+      icon: 'info',
+      confirmButtonColor: '#4f46e5',
+      customClass: { popup: 'rounded-xl' }
+    });
   };
 
   return (
@@ -59,16 +70,16 @@ export default function Navbar() {
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
-              <button onClick={() => alert('Datos OATC')} className="hidden sm:flex px-3 py-1.5 bg-slate-600 text-white hover:bg-slate-700 rounded-lg text-xs font-medium transition-colors shadow-sm">
+              <button onClick={() => handleNavAction('Datos OATC')} className="hidden sm:flex px-3 py-1.5 bg-slate-600 text-white hover:bg-slate-700 rounded-lg text-xs font-medium transition-colors shadow-sm">
                 Datos
               </button>
-              <button onClick={() => alert('Módulo de Fidelización')} className="flex px-3 py-1.5 bg-rose-500 text-white hover:bg-rose-600 rounded-lg text-xs font-medium transition-colors shadow-sm shadow-rose-500/20">
+              <button onClick={() => handleNavAction('Módulo de Fidelización')} className="flex px-3 py-1.5 bg-rose-500 text-white hover:bg-rose-600 rounded-lg text-xs font-medium transition-colors shadow-sm shadow-rose-500/20">
                 Fidelización
               </button>
-              <button onClick={() => alert('Agenda del Día')} className="flex px-3 py-1.5 bg-indigo-500 text-white hover:bg-indigo-600 rounded-lg text-xs font-medium transition-colors shadow-sm shadow-indigo-500/20">
+              <button onClick={() => handleNavAction('Agenda del Día')} className="flex px-3 py-1.5 bg-indigo-500 text-white hover:bg-indigo-600 rounded-lg text-xs font-medium transition-colors shadow-sm shadow-indigo-500/20">
                 Agenda
               </button>
-              <button onClick={() => alert('Gestión de Agentes')} className="hidden sm:flex px-3 py-1.5 bg-sky-500 text-white hover:bg-sky-600 rounded-lg text-xs font-medium transition-colors shadow-sm shadow-sky-500/20">
+              <button onClick={() => handleNavAction('Gestión de Agentes')} className="hidden sm:flex px-3 py-1.5 bg-sky-500 text-white hover:bg-sky-600 rounded-lg text-xs font-medium transition-colors shadow-sm shadow-sky-500/20">
                 Agentes
               </button>
             </div>

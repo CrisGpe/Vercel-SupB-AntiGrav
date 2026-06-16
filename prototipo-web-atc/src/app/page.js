@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import Swal from 'sweetalert2';
 
 export default function ReceptionDashboard() {
   const [agentes, setAgentes] = useState([]);
@@ -35,7 +36,17 @@ export default function ReceptionDashboard() {
   }, []);
 
   const handleAction = async (actionName) => {
-    alert(`Acción: ${actionName}`);
+    Swal.fire({
+      title: 'Operación Pendiente',
+      text: `La lógica para "${actionName}" se conectará en el siguiente paso.`,
+      icon: 'info',
+      confirmButtonColor: '#4f46e5',
+      confirmButtonText: 'Entendido',
+      customClass: {
+        popup: 'rounded-xl',
+        confirmButton: 'rounded-lg px-4 py-2 font-bold'
+      }
+    });
   };
 
   const openAgentModal = (agente) => {
