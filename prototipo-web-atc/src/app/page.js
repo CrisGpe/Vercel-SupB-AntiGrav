@@ -52,7 +52,7 @@ export default function ReceptionDashboard() {
         { data: oatcsData },
         { data: clientesData }
       ] = await Promise.all([
-        supabase.from('agentes').select('*').ilike('estado', 'activo'),
+        supabase.from('agentes').select('*').eq('estado', 'Activo'),
         supabase.from('control_asistencia').select('*').gte('created_at', startOfDay).lte('created_at', endOfDay),
         supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).order('correlativo', { ascending: false }),
         supabase.from('clientes').select('id, nombre, apellido, dni')
@@ -222,8 +222,9 @@ export default function ReceptionDashboard() {
           </div>
           <div className="p-3 flex-1 flex flex-col gap-3">
             <div className="relative">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agente</label>
+              <label htmlFor="agenteIngreso" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agente</label>
               <input 
+                id="agenteIngreso" name="agenteIngreso"
                 list="agentes-list" 
                 value={agenteAsistencia}
                 onChange={(e) => setAgenteAsistencia(e.target.value)}
@@ -256,15 +257,16 @@ export default function ReceptionDashboard() {
             <h2 className="text-sm font-bold m-0 uppercase tracking-wide">Órdenes de atención</h2>
             <div className="flex gap-3 text-xs font-mono bg-slate-700 px-2 py-0.5 rounded">
               <span>N°: <span className="text-amber-400 font-bold">{nextOatcNumber}</span></span>
-              <span>Fecha: {new Date().toLocaleDateString('es-PE')}</span>
+              <span suppressHydrationWarning>Fecha: {new Date().toLocaleDateString('es-PE')}</span>
             </div>
           </div>
           
           <div className="p-3 flex-1 flex flex-col gap-2">
             <div className="grid grid-cols-12 gap-2">
               <div className="col-span-8">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Clientes</label>
+                <label htmlFor="clienteOatc" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Clientes</label>
                 <input 
+                  id="clienteOatc" name="clienteOatc"
                   value={clienteOatc}
                   onChange={(e) => setClienteOatc(e.target.value)}
                   className="w-full px-2 py-1.5 rounded border border-slate-300 outline-none text-sm"
@@ -272,8 +274,9 @@ export default function ReceptionDashboard() {
                 />
               </div>
               <div className="col-span-4">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tipo de demanda</label>
+                <label htmlFor="demandaOatc" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tipo de demanda</label>
                 <select 
+                  id="demandaOatc" name="demandaOatc"
                   value={demandaOatc}
                   onChange={(e) => setDemandaOatc(e.target.value)}
                   className="w-full px-2 py-1.5 rounded border border-slate-300 outline-none text-sm bg-white"
@@ -291,8 +294,9 @@ export default function ReceptionDashboard() {
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agente Disponible</label>
+                <label htmlFor="agenteOatc" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agente Disponible</label>
                 <input 
+                  id="agenteOatc" name="agenteOatc"
                   list="agentes-list"
                   value={agenteOatc}
                   onChange={(e) => setAgenteOatc(e.target.value)}
@@ -301,8 +305,9 @@ export default function ReceptionDashboard() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tipo de atención</label>
+                <label htmlFor="atencionOatc" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tipo de atención</label>
                 <select 
+                  id="atencionOatc" name="atencionOatc"
                   value={atencionOatc}
                   onChange={(e) => setAtencionOatc(e.target.value)}
                   className="w-full px-2 py-1.5 rounded border border-slate-300 outline-none text-sm bg-white"

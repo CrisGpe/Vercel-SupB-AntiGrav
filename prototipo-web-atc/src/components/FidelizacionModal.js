@@ -15,7 +15,7 @@ export default function FidelizacionModal({ isOpen, onClose }) {
 
   const fetchClientes = async (campana) => {
     setLoading(true);
-    let query = supabase.from('clientes').select('id, dni, nombre, apellido, celular, oatc(fecha), camp_tratamientos(tipo)');
+    let query = supabase.from('clientes').select('id, dni, nombre, apellido, celular, oatc(creado_at), camp_tratamientos(tipo)');
     
     const { data, error } = await query;
     if (error) {
@@ -32,8 +32,8 @@ export default function FidelizacionModal({ isOpen, onClose }) {
       // Obtener última fecha OATC
       let ultimaFecha = '---';
       if (c.oatc && c.oatc.length > 0) {
-        const sorted = c.oatc.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-        ultimaFecha = sorted[0].fecha;
+        const sorted = c.oatc.sort((a, b) => new Date(b.creado_at) - new Date(a.creado_at));
+        ultimaFecha = new Date(sorted[0].creado_at).toLocaleDateString('es-PE');
       }
 
       return {
@@ -66,7 +66,7 @@ export default function FidelizacionModal({ isOpen, onClose }) {
       didOpen: () => Swal.showLoading()
     });
 
-    const { data: historial } = await supabase.from('oatc').select('id, fecha, categoria_demanda, agentes(nombre_completo)').eq('cliente_id', cliente.id).order('fecha', { ascending: false });
+    const { data: historial } = await supabase.from('oatc').select('id, creado_at, categoria_demanda, agentes(nombre_completo)').eq('cliente_id', cliente.id).order('creado_at', { ascending: false });
     
     if (!historial || historial.length === 0) {
       Swal.fire('Historial', 'Sin atenciones registradas.', 'info');
@@ -78,7 +78,7 @@ export default function FidelizacionModal({ isOpen, onClose }) {
         <table class="w-full text-left border-collapse">
           <thead><tr class="bg-slate-100"><th class="p-2 border">Fecha</th><th class="p-2 border">Servicio</th><th class="p-2 border">Agente</th></tr></thead>
           <tbody>
-            ${historial.map(h => `<tr><td class="p-2 border">${h.fecha}</td><td class="p-2 border uppercase">${h.categoria_demanda}</td><td class="p-2 border">${h.agentes?.nombre_completo}</td></tr>`).join('')}
+            ${historial.map(h => `<tr><td class="p-2 border">${h.creado_at ? new Date(h.creado_at).toLocaleDateString('es-PE') : '--'}</td><td class="p-2 border uppercase">${h.categoria_demanda}</td><td class="p-2 border">${h.agentes?.nombre_completo}</td></tr>`).join('')}
           </tbody>
         </table>
       </div>
