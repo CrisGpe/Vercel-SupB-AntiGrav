@@ -43,14 +43,11 @@ export default function ReceptionDashboard() {
     if (!isAuthorized) return;
     const fetchData = async () => {
       setLoading(true);
-      // Robust date formatting for America/Lima
-      const now = new Date();
-      const options = { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' };
-      const formatter = new Intl.DateTimeFormat('en-CA', options);
-      const parts = formatter.formatToParts(now);
-      const year = parts.find(p => p.type === 'year').value;
-      const month = parts.find(p => p.type === 'month').value;
-      const day = parts.find(p => p.type === 'day').value;
+      // Robust date formatting for America/Lima without formatToParts which might crash on some engines
+      const d = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Lima"}));
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
       const fechaLima = `${year}-${month}-${day}`;
       
       const startOfDay = `${fechaLima}T00:00:00-05:00`;
