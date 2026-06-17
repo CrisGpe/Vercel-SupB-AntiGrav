@@ -245,12 +245,27 @@ export default function ReceptionDashboard() {
     setShowAgentModal(true);
   };
 
-  if (!isAuthorized) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><p className="text-slate-500">Verificando sesión...</p></div>;
+  if (!isAuthorized || loading) {
+    return <div className="flex h-screen items-center justify-center bg-slate-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500"></div></div>;
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 p-2 font-sans">
+    <div className="min-h-screen bg-slate-100 flex flex-col font-sans relative">
+      
+      {/* GIGANTIC DEBUG DIV */}
+      <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-600 text-white p-4 max-h-[30vh] overflow-auto shadow-2xl border-b-4 border-red-900 font-mono text-xs">
+        <h1 className="font-bold text-lg mb-2">🚨 DEBUG OBLIGATORIO 🚨 (Ignora esto después)</h1>
+        <p><b>URL Supabase:</b> {process.env.NEXT_PUBLIC_SUPABASE_URL || 'UNDEFINED'}</p>
+        <p><b>Total Agentes Cargados:</b> {agentes.length}</p>
+        <p><b>Total Asistencias Hoy:</b> {asistencias.length}</p>
+        <p><b>Total Órdenes (OATC):</b> {oatcs.length}</p>
+        <details className="mt-2 p-2 bg-red-800 rounded">
+          <summary className="cursor-pointer font-bold">Ver JSON completo de Agentes</summary>
+          <pre className="mt-2 text-[10px] whitespace-pre-wrap">{JSON.stringify(agentes, null, 2)}</pre>
+        </details>
+      </div>
+
+      <Navbar activeTab="Recepción" />
       
       {/* 
         Grid Principal: 2 columnas superiores (Formularios) y 2 inferiores (Tablas). 
