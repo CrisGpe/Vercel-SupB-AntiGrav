@@ -67,13 +67,13 @@ export default function POSModal({ oatc, onClose, onSaleComplete }) {
     // Validar precio mínimo
     for (let item of cart) {
       if (item.precio_final < item.precio_venta_minimo) {
-        Swal.fire('Alerta de Precio', \`El producto \${item.nombre} tiene un precio menor a su límite mínimo permitido (S/ \${item.precio_venta_minimo}).\`, 'error');
+        Swal.fire('Alerta de Precio', `El producto ${item.nombre} tiene un precio menor a su límite mínimo permitido (S/ ${item.precio_venta_minimo}).`, 'error');
         return;
       }
       if (item.cantidad > item.stock_actual) {
         const confirm = await Swal.fire({
           title: 'Stock Insuficiente',
-          text: \`Estás vendiendo \${item.cantidad} de \${item.nombre}, pero solo hay \${item.stock_actual} en sistema. ¿Continuar y dejar stock en negativo?\`,
+          text: `Estás vendiendo ${item.cantidad} de ${item.nombre}, pero solo hay ${item.stock_actual} en sistema. ¿Continuar y dejar stock en negativo?`,
           icon: 'warning',
           showCancelButton: true,
           confirmButtonColor: '#eab308'
@@ -137,7 +137,7 @@ export default function POSModal({ oatc, onClose, onSaleComplete }) {
               Agente: {oatc.agentes?.nombre_completo || oatc.agentes?.apodo || '---'}
             </div>
             <div className="bg-black/20 text-white px-3 py-1 rounded text-xs font-mono font-bold">
-              Cliente: {oatc.clientes ? \`\${oatc.clientes.nombre} \${oatc.clientes.apellido}\` : 'Mostrador'}
+              Cliente: {oatc.clientes ? `${oatc.clientes.nombre} ${oatc.clientes.apellido}` : 'Mostrador'}
             </div>
           </div>
           <button onClick={onClose} className="text-white/70 hover:text-white transition-colors">
@@ -234,7 +234,7 @@ export default function POSModal({ oatc, onClose, onSaleComplete }) {
                         </div>
                         <div className="flex-1 flex items-center gap-2">
                           <span className="text-xs font-bold text-slate-400 uppercase">Precio:</span>
-                          <input type="number" step="0.01" value={item.precio_final} onChange={e => updatePrice(item.id, e.target.value)} className={\`w-24 px-2 py-1 border rounded text-sm font-bold outline-none \${item.precio_final < item.precio_venta_minimo ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300 bg-white'}\`} />
+                          <input type="number" step="0.01" value={item.precio_final} onChange={e => updatePrice(item.id, e.target.value)} className={`w-24 px-2 py-1 border rounded text-sm font-bold outline-none ${item.precio_final < item.precio_venta_minimo ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-300 bg-white'}`} />
                         </div>
                       </div>
                     </div>
