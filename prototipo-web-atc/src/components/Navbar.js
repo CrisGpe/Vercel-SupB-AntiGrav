@@ -65,7 +65,7 @@ export default function Navbar() {
                 </span>
               </div>
               
-              <div className="hidden md:flex space-x-1">
+              <div className="hidden md:flex space-x-1 flex-wrap">
                 <button className="px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 text-slate-900 transition-colors">
                   Recepción
                 </button>
@@ -78,6 +78,41 @@ export default function Navbar() {
                   onClick={() => Swal.fire('Módulo en desarrollo', 'La sección "Reportes" estará disponible próximamente.', 'info')}
                   className="px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors">
                   Reportes
+                </button>
+                <button 
+                  onClick={() => Swal.fire('Módulo en desarrollo', 'La sección "Despacho de insumos" estará disponible próximamente.', 'info')}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                  Despacho de insumos
+                </button>
+                <button 
+                  onClick={() => Swal.fire('Módulo en desarrollo', 'La sección "Almacén" estará disponible próximamente.', 'info')}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                  Almacén
+                </button>
+                <button 
+                  onClick={() => Swal.fire('Módulo en desarrollo', 'La sección "Catálogo" estará disponible próximamente.', 'info')}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                  Catálogo
+                </button>
+                <button 
+                  onClick={() => setShowDatos(true)}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                  Datos
+                </button>
+                <button 
+                  onClick={() => setShowFidelizacion(true)}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                  CRM
+                </button>
+                <button 
+                  onClick={() => setShowAgenda(true)}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                  Agenda
+                </button>
+                <button 
+                  onClick={() => setShowAgentes(true)}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+                  Agentes
                 </button>
               </div>
             </div>
@@ -99,18 +134,6 @@ export default function Navbar() {
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
-                <button onClick={() => setShowDatos(true)} className="hidden sm:flex px-3 py-1.5 bg-slate-600 text-white hover:bg-slate-700 rounded-lg text-xs font-medium transition-colors shadow-sm">
-                  Datos
-                </button>
-                <button onClick={() => setShowFidelizacion(true)} className="flex px-3 py-1.5 bg-rose-500 text-white hover:bg-rose-600 rounded-lg text-xs font-medium transition-colors shadow-sm shadow-rose-500/20">
-                  Fidelización
-                </button>
-                <button onClick={() => setShowAgenda(true)} className="flex px-3 py-1.5 bg-indigo-500 text-white hover:bg-indigo-600 rounded-lg text-xs font-medium transition-colors shadow-sm shadow-indigo-500/20">
-                  Agenda
-                </button>
-                <button onClick={() => setShowAgentes(true)} className="hidden sm:flex px-3 py-1.5 bg-sky-500 text-white hover:bg-sky-600 rounded-lg text-xs font-medium transition-colors shadow-sm shadow-sky-500/20">
-                  Agentes
-                </button>
                 <button onClick={handleLogout} className="flex px-3 py-1.5 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-lg text-xs font-bold transition-colors ml-2">
                   Salir
                 </button>
