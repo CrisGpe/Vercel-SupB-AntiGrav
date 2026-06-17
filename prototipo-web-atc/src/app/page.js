@@ -43,7 +43,16 @@ export default function ReceptionDashboard() {
     if (!isAuthorized) return;
     const fetchData = async () => {
       setLoading(true);
-      const fechaLima = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+      // Robust date formatting for America/Lima
+      const now = new Date();
+      const options = { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' };
+      const formatter = new Intl.DateTimeFormat('en-CA', options);
+      const parts = formatter.formatToParts(now);
+      const year = parts.find(p => p.type === 'year').value;
+      const month = parts.find(p => p.type === 'month').value;
+      const day = parts.find(p => p.type === 'day').value;
+      const fechaLima = `${year}-${month}-${day}`;
+      
       const startOfDay = `${fechaLima}T00:00:00-05:00`;
       const endOfDay = `${fechaLima}T23:59:59-05:00`;
       
@@ -231,17 +240,15 @@ export default function ReceptionDashboard() {
           <div className="p-3 flex-1 flex flex-col gap-3">
             <div className="relative">
               <label htmlFor="agenteIngreso" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agente</label>
-              <input 
+              <select 
                 id="agenteIngreso" name="agenteIngreso"
-                list="agentes-list" 
                 value={agenteAsistencia}
                 onChange={(e) => setAgenteAsistencia(e.target.value)}
-                className="w-full px-2 py-1.5 rounded border border-slate-300 focus:border-indigo-500 outline-none text-sm"
-                placeholder="Agente"
-              />
-              <datalist id="agentes-list">
-                {agentes.map(a => <option key={a.id} value={a.nombre_completo || a.apodo} />)}
-              </datalist>
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-sky-500 outline-none transition-all" 
+              >
+                <option value="">Seleccionar agente...</option>
+                {agentes.map(a => <option key={a.id} value={a.nombre_completo || a.apodo}>{a.nombre_completo || a.apodo}</option>)}
+              </select>
             </div>
 
             <div className="grid grid-cols-3 gap-1.5">
@@ -303,14 +310,15 @@ export default function ReceptionDashboard() {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label htmlFor="agenteOatc" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agente Disponible</label>
-                <input 
+                <select 
                   id="agenteOatc" name="agenteOatc"
-                  list="agentes-list"
                   value={agenteOatc}
                   onChange={(e) => setAgenteOatc(e.target.value)}
-                  className="w-full px-2 py-1.5 rounded border border-slate-300 outline-none text-sm"
-                  placeholder="Agente"
-                />
+                  className="w-full px-2 py-1.5 rounded border border-slate-300 focus:border-indigo-500 outline-none text-sm"
+                >
+                  <option value="">Seleccionar agente...</option>
+                  {agentes.map(a => <option key={a.id} value={a.nombre_completo || a.apodo}>{a.nombre_completo || a.apodo}</option>)}
+                </select>
               </div>
               <div>
                 <label htmlFor="atencionOatc" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tipo de atención</label>
