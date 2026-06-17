@@ -103,13 +103,11 @@ export default function ReceptionDashboard() {
 
       // FORCED DEBUG ALERT
       setTimeout(() => {
-        import('sweetalert2').then(Swal => {
-          Swal.default.fire({
-            title: '🔍 Reporte de Depuración',
-            html: `<b>Agentes descargados:</b> ${rawAgentesData ? rawAgentesData.length : 'NULL'}<br>` +
-                  `<b>Asistencias hoy:</b> ${asistData ? asistData.length : 'NULL'}<br>` +
-                  `<b>URL Supabase:</b> ${process.env.NEXT_PUBLIC_SUPABASE_URL || 'NO CONFIGURADA'}`
-          });
+        Swal.fire({
+          title: '🔍 Reporte de Depuración',
+          html: `<b>Agentes descargados:</b> ${rawAgentesData ? rawAgentesData.length : 'NULL'}<br>` +
+                `<b>Asistencias hoy:</b> ${asistData ? asistData.length : 'NULL'}<br>` +
+                `<b>URL Supabase:</b> ${process.env.NEXT_PUBLIC_SUPABASE_URL || 'NO CONFIGURADA'}`
         });
       }, 1000);
     };
