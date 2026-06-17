@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Swal from 'sweetalert2';
-import Navbar from '@/components/Navbar'; // Asumo que se usa aquí si se necesita, si no, se deja igual.
+import Navbar from '@/components/Navbar';
+import POSModal from '@/components/POSModal';
 
 export default function ReceptionDashboard() {
   const router = useRouter();
@@ -23,6 +24,9 @@ export default function ReceptionDashboard() {
   // Modal State
   const [showAgentModal, setShowAgentModal] = useState(false);
   const [selectedAgentData, setSelectedAgentData] = useState(null);
+  
+  // POS Modal State
+  const [posOatc, setPosOatc] = useState(null);
 
   const [asistencias, setAsistencias] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -237,12 +241,7 @@ export default function ReceptionDashboard() {
         setClienteOatc(''); setDemandaOatc(''); setAgenteOatc(''); setAtencionOatc('');
       }
       else if (actionName === 'Generar Ticket') {
-        Swal.fire({
-          title: 'Próximamente',
-          text: `Esta función requiere el módulo de Catálogo (Fase 2).`,
-          icon: 'info',
-          confirmButtonColor: '#9333ea', // purple-600
-        });
+        // Obsoleto, manejado directamente con setPosOatc
         return;
       }
       else {
@@ -272,6 +271,40 @@ export default function ReceptionDashboard() {
       
     } catch (e) {
       Swal.fire('Error', `Fallo al registrar: ${e.message}`, 'error');
+    }
+  };
+
+  const handleSaleComplete = async (completedOatc) => {
+    try {
+      // 1. Eliminar la OATC (o marcarla como resuelta)
+      await supabase.from('oatc').delete().eq('id', completedOatc.id);
+      
+      // 2. Liberar al agente (Cambiar estado de Vendiendo a Disponible)
+      const nowIso = new Date().toISOString();
+      const asis = asistencias.find(a => a.agente_id === completedOatc.agente_id);
+      if (asis) {
+        await supabase.from('control_asistencia').update({ estado_texto: 'Disponible', ultima_act: nowIso }).eq('id', asis.id);
+      }
+
+      Swal.fire('Venta Completada', 'Ticket generado y agente liberado.', 'success');
+      setPosOatc(null);
+
+      // 3. Recargar datos
+      const fechaLima = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+      const startOfDay = `${fechaLima}T00:00:00-05:00`;
+      const endOfDay = `${fechaLima}T23:59:59-05:00`;
+      const [ { data: newAsist }, { data: newOatcs } ] = await Promise.all([
+        supabase.from('control_asistencia').select('*').gte('created_at', startOfDay).lte('created_at', endOfDay),
+        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).order('correlativo', { ascending: false })
+      ]);
+      if (newAsist) setAsistencias(newAsist);
+      if (newOatcs) {
+        setOatcs(newOatcs);
+        setNextOatcNumber(newOatcs.length > 0 ? (newOatcs[0].correlativo + 1).toString() : '1');
+      }
+    } catch (e) {
+      console.error(e);
+      Swal.fire('Error', 'Fallo al finalizar el ticket de venta', 'error');
     }
   };
 
@@ -522,7 +555,7 @@ export default function ReceptionDashboard() {
                     <td className="px-2 py-2 text-center">
                       <div className="flex justify-center gap-1">
                         {o.tipo_oatc === 'Venta de Producto' ? (
-                          <button onClick={() => handleAction('Generar Ticket')} className="px-2 py-1 bg-purple-500 text-white rounded text-[10px] font-bold hover:bg-purple-600">Generar Ticket</button>
+                          <button onClick={() => setPosOatc(o)} className="px-2 py-1 bg-purple-500 text-white rounded text-[10px] font-bold hover:bg-purple-600">Generar Ticket</button>
                         ) : (
                           <button onClick={() => handleAction('Resolver OATC')} className="px-2 py-1 bg-emerald-500 text-white rounded text-[10px] font-bold hover:bg-emerald-600">Resolver</button>
                         )}
@@ -617,6 +650,15 @@ export default function ReceptionDashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL: PUNTO DE VENTA (RETAIL) */}
+      {posOatc && (
+        <POSModal 
+          oatc={posOatc} 
+          onClose={() => setPosOatc(null)} 
+          onSaleComplete={handleSaleComplete} 
+        />
       )}
 
     </div>
