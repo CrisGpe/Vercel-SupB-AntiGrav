@@ -196,6 +196,53 @@ export default function ReceptionDashboard() {
         
         Swal.fire('¡Éxito!', `OATC N° ${nextOatcNumber} registrada.`, 'success');
         setClienteOatc(''); setDemandaOatc(''); setAgenteOatc(''); setAtencionOatc('');
+      else if (actionName === 'Venta de Producto') {
+        if (!agenteOatc) {
+          Swal.fire('Atención', 'Seleccione un Agente Disponible que realizará la venta.', 'warning');
+          return;
+        }
+
+        const agenteOatcObj = agentes.find(a => a.nombre_completo === agenteOatc || a.apodo === agenteOatc);
+        if (!agenteOatcObj) {
+          Swal.fire('Error', 'Agente no existe.', 'error');
+          return;
+        }
+
+        let clienteId = null;
+        if (clienteOatc) {
+          const cli = clientes.find(c => `${c.nombre} ${c.apellido}`.toLowerCase().includes(clienteOatc.toLowerCase()) || c.dni === clienteOatc);
+          if (cli) clienteId = cli.id;
+        }
+
+        const payload = {
+          correlativo: parseInt(nextOatcNumber, 10),
+          creado_at: nowIso,
+          cliente_id: clienteId,
+          tipo_oatc: 'Venta de Producto',
+          categoria_demanda: 'producto',
+          agente_id: agenteOatcObj.id
+        };
+
+        const { error: oatcErr } = await supabase.from('oatc').insert(payload);
+        if (oatcErr) throw oatcErr;
+
+        // Cambiar estado a Vendiendo
+        const asis = asistencias.find(a => a.agente_id === agenteOatcObj.id);
+        if (asis) {
+          await supabase.from('control_asistencia').update({ estado_texto: 'Vendiendo', ultima_act: nowIso }).eq('id', asis.id);
+        }
+        
+        Swal.fire('¡Éxito!', `Orden de Venta creada. El agente está Vendiendo.`, 'success');
+        setClienteOatc(''); setDemandaOatc(''); setAgenteOatc(''); setAtencionOatc('');
+      }
+      else if (actionName === 'Generar Ticket') {
+        Swal.fire({
+          title: 'Próximamente',
+          text: `Esta función requiere el módulo de Catálogo (Fase 2).`,
+          icon: 'info',
+          confirmButtonColor: '#9333ea', // purple-600
+        });
+        return;
       }
       else {
         Swal.fire({
@@ -227,8 +274,43 @@ export default function ReceptionDashboard() {
     }
   };
 
-  const openAgentModal = (agente) => {
-    setSelectedAgentData(agente);
+  const handleDeleteOATC = async (id) => {
+    const result = await Swal.fire({
+      title: '¿Eliminar orden?',
+      text: "Esta acción no se puede deshacer",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const { error } = await supabase.from('oatc').delete().eq('id', id);
+        if (error) throw error;
+        
+        Swal.fire('Eliminado', 'La orden ha sido eliminada.', 'success');
+        setOatcs(prev => prev.filter(o => o.id !== id));
+      } catch (e) {
+        Swal.fire('Error', e.message, 'error');
+      }
+    }
+  };
+
+  const openAgentModal = (agente, asistencia) => {
+    // Calcular OATCs del día para este agente
+    const agentOatcs = oatcs.filter(o => o.agente_id === agente.id);
+    const qClientes = agentOatcs.filter(o => ['cliente', 'correccion', 'producto'].includes(o.categoria_demanda?.toLowerCase())).length;
+    const qTurnos = agentOatcs.filter(o => ['turno', 'turno_nino', 'turno_caballero'].includes(o.categoria_demanda?.toLowerCase())).length;
+    
+    setSelectedAgentData({ 
+      ...agente, 
+      asistencia, 
+      qClientes, 
+      qTurnos 
+    });
     setShowAgentModal(true);
   };
 
@@ -315,7 +397,6 @@ export default function ReceptionDashboard() {
                   <option value="correccion">Corrección</option>
                   <option value="turno_nino">Turno niño</option>
                   <option value="turno_caballero">Turno caballero</option>
-                  <option value="producto">Producto</option>
                 </select>
               </div>
             </div>
@@ -351,10 +432,11 @@ export default function ReceptionDashboard() {
               </div>
             </div>
 
-            <div className="mt-auto grid grid-cols-3 gap-1.5 pt-2">
+            <div className="mt-auto grid grid-cols-4 gap-1.5 pt-2">
               <button onClick={() => handleAction('Registrar OATC')} className="py-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded font-bold text-xs shadow-sm">Registrar Orden</button>
               <button onClick={() => handleAction('Registrar Cita')} className="py-2 bg-slate-100 border border-slate-300 text-slate-800 hover:bg-slate-200 rounded font-bold text-xs shadow-sm">Registrar Cita</button>
               <button onClick={() => handleAction('Registrar Cliente')} className="py-2 bg-amber-400 text-amber-950 hover:bg-amber-500 rounded font-bold text-xs shadow-sm">Registrar Cliente</button>
+              <button onClick={() => handleAction('Venta de Producto')} className="py-2 bg-purple-600 text-white hover:bg-purple-700 rounded font-bold text-xs shadow-sm">Venta Producto</button>
             </div>
           </div>
         </div>
@@ -370,8 +452,6 @@ export default function ReceptionDashboard() {
                 <tr>
                   <th className="px-2 py-2 text-center" title="Atenciones a Clientes">Q Cli</th>
                   <th className="px-2 py-2 text-center" title="Atenciones a Turnos">Q Tur</th>
-                  <th className="px-2 py-2">Ingreso</th>
-                  <th className="px-2 py-2">Salida</th>
                   <th className="px-2 py-2">Agente</th>
                   <th className="px-2 py-2">Estado</th>
                   <th className="px-2 py-2 text-right">Act.</th>
@@ -382,11 +462,9 @@ export default function ReceptionDashboard() {
                   const a = agentes.find(ag => ag.id === asist.agente_id);
                   if (!a) return null;
                   return (
-                    <tr key={asist.id} className="hover:bg-indigo-50 transition-colors cursor-pointer group" onClick={() => openAgentModal(a)}>
+                    <tr key={asist.id} className="hover:bg-indigo-50 transition-colors cursor-pointer group" onClick={() => openAgentModal(a, asist)}>
                       <td className="px-2 py-2 text-center font-mono font-bold text-indigo-600">-</td>
                       <td className="px-2 py-2 text-center font-mono font-bold text-sky-600">-</td>
-                      <td className="px-2 py-2 text-slate-500">{asist.entrada_at ? new Date(asist.entrada_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</td>
-                      <td className="px-2 py-2 text-slate-500">{asist.salida_at ? new Date(asist.salida_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</td>
                       <td className="px-2 py-2 font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{a.nombre_completo || a.apodo}</td>
                       <td className="px-2 py-2">
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${asist.estado_texto === 'Disponible' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'}`}>
@@ -442,9 +520,16 @@ export default function ReceptionDashboard() {
                     </td>
                     <td className="px-2 py-2 text-center">
                       <div className="flex justify-center gap-1">
-                        <button className="px-2 py-1 bg-emerald-500 text-white rounded text-[10px] font-bold hover:bg-emerald-600">Resolver</button>
-                        <button className="px-2 py-1 bg-amber-500 text-white rounded text-[10px] font-bold hover:bg-amber-600">Espera</button>
-                        <button className="px-2 py-1 bg-red-500 text-white rounded text-[10px] font-bold hover:bg-red-600">X</button>
+                        {o.tipo_oatc === 'Venta de Producto' ? (
+                          <button onClick={() => handleAction('Generar Ticket')} className="px-2 py-1 bg-purple-500 text-white rounded text-[10px] font-bold hover:bg-purple-600">Generar Ticket</button>
+                        ) : (
+                          <button onClick={() => handleAction('Resolver OATC')} className="px-2 py-1 bg-emerald-500 text-white rounded text-[10px] font-bold hover:bg-emerald-600">Resolver</button>
+                        )}
+                        <button onClick={() => handleDeleteOATC(o.id)} className="px-2 py-1 bg-red-500 text-white rounded text-[10px] font-bold hover:bg-red-600 flex items-center justify-center" title="Eliminar Orden">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -485,19 +570,27 @@ export default function ReceptionDashboard() {
               <div className="border rounded-lg overflow-hidden divide-y divide-slate-100">
                 <div className="flex justify-between p-3 bg-slate-50">
                   <span className="font-bold text-slate-600 text-sm">Entrada:</span>
-                  <span className="font-mono text-slate-800 text-sm bg-white px-2 py-0.5 rounded border shadow-sm">09:00 AM</span>
+                  <span className="font-mono text-slate-800 text-sm bg-white px-2 py-0.5 rounded border shadow-sm">
+                    {selectedAgentData.asistencia?.entrada_at ? new Date(selectedAgentData.asistencia.entrada_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                  </span>
                 </div>
                 <div className="flex justify-between p-3 bg-slate-50">
                   <span className="font-bold text-slate-600 text-sm">Inicio Refrigerio:</span>
-                  <span className="font-mono text-slate-800 text-sm bg-white px-2 py-0.5 rounded border shadow-sm">--:--</span>
+                  <span className="font-mono text-slate-800 text-sm bg-white px-2 py-0.5 rounded border shadow-sm">
+                    {selectedAgentData.asistencia?.ref_inicio_at ? new Date(selectedAgentData.asistencia.ref_inicio_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                  </span>
                 </div>
                 <div className="flex justify-between p-3 bg-slate-50">
                   <span className="font-bold text-slate-600 text-sm">Fin Refrigerio:</span>
-                  <span className="font-mono text-slate-800 text-sm bg-white px-2 py-0.5 rounded border shadow-sm">--:--</span>
+                  <span className="font-mono text-slate-800 text-sm bg-white px-2 py-0.5 rounded border shadow-sm">
+                    {selectedAgentData.asistencia?.ref_termino_at ? new Date(selectedAgentData.asistencia.ref_termino_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                  </span>
                 </div>
                 <div className="flex justify-between p-3 bg-slate-50">
                   <span className="font-bold text-slate-600 text-sm">Salida:</span>
-                  <span className="font-mono text-slate-800 text-sm bg-white px-2 py-0.5 rounded border shadow-sm">--:--</span>
+                  <span className="font-mono text-slate-800 text-sm bg-white px-2 py-0.5 rounded border shadow-sm">
+                    {selectedAgentData.asistencia?.salida_at ? new Date(selectedAgentData.asistencia.salida_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                  </span>
                 </div>
               </div>
 
@@ -505,11 +598,11 @@ export default function ReceptionDashboard() {
                 <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Resumen de Atenciones</h5>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-lg text-center">
-                    <div className="text-2xl font-black text-indigo-600">3</div>
+                    <div className="text-2xl font-black text-indigo-600">{selectedAgentData.qClientes || 0}</div>
                     <div className="text-[10px] font-bold text-indigo-800 uppercase mt-1">Clientes</div>
                   </div>
                   <div className="bg-sky-50 border border-sky-100 p-3 rounded-lg text-center">
-                    <div className="text-2xl font-black text-sky-600">1</div>
+                    <div className="text-2xl font-black text-sky-600">{selectedAgentData.qTurnos || 0}</div>
                     <div className="text-[10px] font-bold text-sky-800 uppercase mt-1">Turnos</div>
                   </div>
                 </div>
