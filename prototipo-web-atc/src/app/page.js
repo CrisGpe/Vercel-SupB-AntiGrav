@@ -496,10 +496,12 @@ export default function ReceptionDashboard() {
                   .sort((a, b) => {
                     const getPrio = (st) => {
                       const s = String(st || '').trim().toLowerCase();
-                      if (s === 'disponible' || s === 'pasar la voz') return 1;
-                      if (s === 'trabajando' || s === 'vendiendo') return 2;
-                      if (s === 'salida' || s === 'salió del salón') return 4;
-                      return 3;
+                      if (s === 'disponible') return 1;
+                      if (s === 'asesorando') return 2;
+                      if (s === 'trabajando' || s === 'vendiendo') return 3;
+                      if (s === 'ausente') return 5;
+                      // Cualquier otro estado: pasar la voz, psicólogo, en otro salón, en refrigerio, salió, etc.
+                      return 4;
                     };
                     const prioA = getPrio(a.estado_texto);
                     const prioB = getPrio(b.estado_texto);
