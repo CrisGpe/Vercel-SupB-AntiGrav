@@ -196,6 +196,7 @@ export default function ReceptionDashboard() {
         
         Swal.fire('¡Éxito!', `OATC N° ${nextOatcNumber} registrada.`, 'success');
         setClienteOatc(''); setDemandaOatc(''); setAgenteOatc(''); setAtencionOatc('');
+      }
       else if (actionName === 'Venta de Producto') {
         if (!agenteOatc) {
           Swal.fire('Atención', 'Seleccione un Agente Disponible que realizará la venta.', 'warning');
