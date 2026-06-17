@@ -238,7 +238,6 @@ export default function ReceptionDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 p-2 font-sans">
-      <Navbar activeTab="Recepción" />
       
       {/* 
         Grid Principal: 2 columnas superiores (Formularios) y 2 inferiores (Tablas). 
