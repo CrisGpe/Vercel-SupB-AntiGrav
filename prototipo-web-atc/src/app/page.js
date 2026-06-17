@@ -56,6 +56,8 @@ export default function ReceptionDashboard() {
       const startOfDay = `${fechaLima}T00:00:00-05:00`;
       const endOfDay = `${fechaLima}T23:59:59-05:00`;
       
+      console.log("🚀 FETCH_DATA INICIADO", { startOfDay, endOfDay });
+      
       // Fetch data
       const [
         { data: rawAgentesData, error: errAgentes }, 
@@ -69,8 +71,19 @@ export default function ReceptionDashboard() {
         supabase.from('clientes').select('id, nombre, apellido, dni')
       ]);
 
+      console.log("📦 RESPUESTA SUPABASE:", {
+        rawAgentesData,
+        asistData,
+        oatcsData,
+        clientesData,
+        errAgentes,
+        errAsist,
+        errOatc,
+        errClientes
+      });
+
       if (errAgentes || errAsist || errOatc || errClientes) {
-        console.error("Supabase Fetch Errors:", { errAgentes, errAsist, errOatc, errClientes });
+        console.error("❌ ERRORES DE SUPABASE:", { errAgentes, errAsist, errOatc, errClientes });
       }
 
       if (rawAgentesData) {
