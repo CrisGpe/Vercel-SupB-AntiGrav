@@ -97,16 +97,6 @@ export default function ReceptionDashboard() {
       if (clientesData) setClientes(clientesData);
       
       setLoading(false);
-
-      // FORCED DEBUG ALERT
-      setTimeout(() => {
-        Swal.fire({
-          title: '🔍 Reporte de Depuración',
-          html: `<b>Agentes descargados:</b> ${rawAgentesData ? rawAgentesData.length : 'NULL'}<br>` +
-                `<b>Asistencias hoy:</b> ${asistData ? asistData.length : 'NULL'}<br>` +
-                `<b>URL Supabase:</b> ${process.env.NEXT_PUBLIC_SUPABASE_URL || 'NO CONFIGURADA'}`
-        });
-      }, 1000);
     };
     fetchData();
   }, [isAuthorized]);
@@ -247,21 +237,7 @@ export default function ReceptionDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans relative">
-      
-      {/* GIGANTIC DEBUG DIV */}
-      <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-600 text-white p-4 max-h-[30vh] overflow-auto shadow-2xl border-b-4 border-red-900 font-mono text-xs">
-        <h1 className="font-bold text-lg mb-2">🚨 DEBUG OBLIGATORIO 🚨 (Ignora esto después)</h1>
-        <p><b>URL Supabase:</b> {process.env.NEXT_PUBLIC_SUPABASE_URL || 'UNDEFINED'}</p>
-        <p><b>Total Agentes Cargados:</b> {agentes.length}</p>
-        <p><b>Total Asistencias Hoy:</b> {asistencias.length}</p>
-        <p><b>Total Órdenes (OATC):</b> {oatcs.length}</p>
-        <details className="mt-2 p-2 bg-red-800 rounded">
-          <summary className="cursor-pointer font-bold">Ver JSON completo de Agentes</summary>
-          <pre className="mt-2 text-[10px] whitespace-pre-wrap">{JSON.stringify(agentes, null, 2)}</pre>
-        </details>
-      </div>
-
+    <div className="min-h-screen bg-slate-100 text-slate-900 p-2 font-sans">
       <Navbar activeTab="Recepción" />
       
       {/* 
