@@ -84,6 +84,9 @@ export default function ReceptionDashboard() {
 
       if (errAgentes || errAsist || errOatc || errClientes) {
         console.error("❌ ERRORES DE SUPABASE:", { errAgentes, errAsist, errOatc, errClientes });
+        import('sweetalert2').then(Swal => {
+          Swal.default.fire('Error de Conexión', 'Hubo un error cargando datos de Supabase', 'error');
+        });
       }
 
       if (rawAgentesData) {
@@ -97,6 +100,18 @@ export default function ReceptionDashboard() {
       if (clientesData) setClientes(clientesData);
       
       setLoading(false);
+
+      // FORCED DEBUG ALERT
+      setTimeout(() => {
+        import('sweetalert2').then(Swal => {
+          Swal.default.fire({
+            title: '🔍 Reporte de Depuración',
+            html: `<b>Agentes descargados:</b> ${rawAgentesData ? rawAgentesData.length : 'NULL'}<br>` +
+                  `<b>Asistencias hoy:</b> ${asistData ? asistData.length : 'NULL'}<br>` +
+                  `<b>URL Supabase:</b> ${process.env.NEXT_PUBLIC_SUPABASE_URL || 'NO CONFIGURADA'}`
+          });
+        });
+      }, 1000);
     };
     fetchData();
   }, []);
