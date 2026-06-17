@@ -492,7 +492,24 @@ export default function ReceptionDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {asistencias.map(asist => {
+                {[...asistencias]
+                  .sort((a, b) => {
+                    const getPrio = (st) => {
+                      const s = String(st || '').trim().toLowerCase();
+                      if (s === 'disponible' || s === 'pasar la voz') return 1;
+                      if (s === 'trabajando' || s === 'vendiendo') return 2;
+                      if (s === 'salida' || s === 'salió del salón') return 4;
+                      return 3;
+                    };
+                    const prioA = getPrio(a.estado_texto);
+                    const prioB = getPrio(b.estado_texto);
+                    if (prioA !== prioB) return prioA - prioB;
+                    
+                    const timeA = new Date(a.ultima_act || 0).getTime();
+                    const timeB = new Date(b.ultima_act || 0).getTime();
+                    return timeA - timeB;
+                  })
+                  .map(asist => {
                   const a = agentes.find(ag => ag.id === asist.agente_id);
                   if (!a) return null;
                   return (
