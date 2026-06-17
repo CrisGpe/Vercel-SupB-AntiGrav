@@ -109,7 +109,7 @@ export default function ReceptionDashboard() {
       }, 1000);
     };
     fetchData();
-  }, []);
+  }, [isAuthorized]);
 
   const getLimaDate = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
   const getLimaTime = () => new Date().toLocaleTimeString('en-US', { timeZone: 'America/Lima', hour12: true, hour: 'numeric', minute: '2-digit' }).toLowerCase();
