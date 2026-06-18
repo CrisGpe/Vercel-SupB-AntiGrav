@@ -146,7 +146,7 @@ export default function ReceptionDashboard() {
           return;
         }
         const { error } = await supabase.from('control_asistencia').update({
-          salida_at: nowIso, estado_texto: 'Ausente', ultima_act: nowIso
+          salida_at: nowIso, estado_texto: 'Ausente'
         }).eq('id', asistenciaActual.id);
         if (error) throw error;
         Swal.fire('¡Éxito!', 'Salida registrada correctamente.', 'success');
@@ -158,13 +158,13 @@ export default function ReceptionDashboard() {
         }
         if (!asistenciaActual.ref_inicio_at && !asistenciaActual.ref_termino_at) {
           const { error } = await supabase.from('control_asistencia').update({
-            ref_inicio_at: nowIso, estado_texto: 'En refrigerio', ultima_act: nowIso
+            ref_inicio_at: nowIso, estado_texto: 'En refrigerio'
           }).eq('id', asistenciaActual.id);
           if (error) throw error;
           Swal.fire('¡Éxito!', 'Inicio de refrigerio registrado.', 'success');
         } else if (asistenciaActual.ref_inicio_at && !asistenciaActual.ref_termino_at) {
           const { error } = await supabase.from('control_asistencia').update({
-            ref_termino_at: nowIso, estado_texto: 'Disponible', ultima_act: nowIso
+            ref_termino_at: nowIso, estado_texto: 'Disponible'
           }).eq('id', asistenciaActual.id);
           if (error) throw error;
           Swal.fire('¡Éxito!', 'Término de refrigerio registrado.', 'success');
@@ -236,10 +236,10 @@ export default function ReceptionDashboard() {
         const { error: oatcErr } = await supabase.from('oatc').insert(payload);
         if (oatcErr) throw oatcErr;
 
-        // Cambiar estado a Vendiendo
+        // Cambiar estado a Vendiendo (sin afectar ultima_act para que conserve su prioridad inicial si se cancela la venta)
         const asis = asistencias.find(a => a.agente_id === agenteOatcObj.id);
         if (asis) {
-          await supabase.from('control_asistencia').update({ estado_texto: 'Vendiendo', ultima_act: nowIso }).eq('id', asis.id);
+          await supabase.from('control_asistencia').update({ estado_texto: 'Vendiendo' }).eq('id', asis.id);
         }
         
         Swal.fire('¡Éxito!', `Orden de Venta creada. El agente está Vendiendo.`, 'success');
