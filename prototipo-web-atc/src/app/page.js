@@ -236,13 +236,7 @@ export default function ReceptionDashboard() {
         const { error: oatcErr } = await supabase.from('oatc').insert(payload);
         if (oatcErr) throw oatcErr;
 
-        // Cambiar estado a Vendiendo (sin afectar ultima_act para que conserve su prioridad inicial si se cancela la venta)
-        const asis = asistencias.find(a => a.agente_id === agenteOatcObj.id);
-        if (asis) {
-          await supabase.from('control_asistencia').update({ estado_texto: 'Vendiendo' }).eq('id', asis.id);
-        }
-        
-        Swal.fire('¡Éxito!', `Orden de Venta creada. El agente está Vendiendo.`, 'success');
+        Swal.fire('¡Éxito!', `Orden de Venta creada exitosamente.`, 'success');
         setClienteOatc(''); setDemandaOatc(''); setAgenteOatc(''); setAtencionOatc('');
       }
       else if (actionName === 'Generar Ticket') {
@@ -284,14 +278,16 @@ export default function ReceptionDashboard() {
       // 1. Eliminar la OATC (o marcarla como resuelta)
       await supabase.from('oatc').delete().eq('id', completedOatc.id);
       
-      // 2. Liberar al agente (Cambiar estado de Vendiendo a Disponible)
+      // 2. Liberar al agente: Sólo si estaba "Trabajando" en un servicio. Las ventas de producto no bloquean al agente.
       const nowIso = new Date().toISOString();
-      const asis = asistencias.find(a => a.agente_id === completedOatc.agente_id);
-      if (asis) {
-        await supabase.from('control_asistencia').update({ estado_texto: 'Disponible', ultima_act: nowIso }).eq('id', asis.id);
+      if (completedOatc.tipo_oatc !== 'Venta de Producto') {
+        const asis = asistencias.find(a => a.agente_id === completedOatc.agente_id);
+        if (asis) {
+          await supabase.from('control_asistencia').update({ estado_texto: 'Disponible', ultima_act: nowIso }).eq('id', asis.id);
+        }
       }
 
-      Swal.fire('Venta Completada', 'Ticket generado y agente liberado.', 'success');
+      Swal.fire('Venta Registrada', 'Ticket enviado a Caja.', 'success');
       setPosOatc(null);
 
       // 3. Recargar datos

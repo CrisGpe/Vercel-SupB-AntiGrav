@@ -91,7 +91,8 @@ export default function POSModal({ oatc, onClose, onSaleComplete }) {
         oatc_id: oatc.id,
         cliente_id: oatc.cliente_id,
         agente_id: oatc.agente_id,
-        monto_total: total
+        monto_total: total,
+        estado: 'Pendiente de Pago'
       }).select().single();
 
       if (vErr) throw vErr;
@@ -252,10 +253,10 @@ export default function POSModal({ oatc, onClose, onSaleComplete }) {
               <button 
                 onClick={procesarVenta}
                 disabled={cart.length === 0}
-                className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-xl font-black text-lg shadow-lg hover:shadow-xl transition-all disabled:shadow-none flex justify-center items-center gap-2"
+                className="w-full py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-xl font-black text-lg shadow-lg hover:shadow-xl transition-all disabled:shadow-none flex justify-center items-center gap-2"
               >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                COBRAR Y GENERAR TICKET
+                ENVIAR A CAJA
               </button>
             </div>
           </div>
