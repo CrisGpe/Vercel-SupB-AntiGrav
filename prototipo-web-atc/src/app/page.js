@@ -436,7 +436,7 @@ export default function ReceptionDashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-2 mb-2">
+            <div className="grid grid-cols-2 gap-2 mb-2">
               <div>
                 <label htmlFor="agenteOatc" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agente Disponible</label>
                 <select 
@@ -449,19 +449,14 @@ export default function ReceptionDashboard() {
                   {agentes.map(a => <option key={a.id} value={a.nombre_completo || a.apodo}>{a.nombre_completo || a.apodo}</option>)}
                 </select>
               </div>
-            </div>
-            
-            <div className="mb-2">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tipo de atención (Servicio)</label>
-              <CascadingServiceSelect 
-                onSelectValue={(val) => setAtencionOatc(val)} 
-                onClear={() => setAtencionOatc('')} 
-              />
-              {atencionOatc && (
-                <div className="text-[10px] text-indigo-600 font-bold mt-1.5 bg-indigo-50 inline-block px-2 py-0.5 rounded border border-indigo-100">
-                  Seleccionado: <span className="uppercase">{atencionOatc}</span>
-                </div>
-              )}
+              <div className="relative">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tipo de atención (Servicio)</label>
+                <CascadingServiceSelect 
+                  value={atencionOatc}
+                  onSelectValue={(val) => setAtencionOatc(val)} 
+                  onClear={() => setAtencionOatc('')} 
+                />
+              </div>
             </div>
 
             <div className="mt-auto grid grid-cols-4 gap-1.5 pt-2">
