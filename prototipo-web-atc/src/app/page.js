@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import Swal from 'sweetalert2';
 import Navbar from '@/components/Navbar';
 import POSModal from '@/components/POSModal';
+import CascadingServiceSelect from '@/components/CascadingServiceSelect';
 
 export default function ReceptionDashboard() {
   const router = useRouter();
@@ -435,7 +436,7 @@ export default function ReceptionDashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 mb-2">
               <div>
                 <label htmlFor="agenteOatc" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agente Disponible</label>
                 <select 
@@ -448,22 +449,19 @@ export default function ReceptionDashboard() {
                   {agentes.map(a => <option key={a.id} value={a.nombre_completo || a.apodo}>{a.nombre_completo || a.apodo}</option>)}
                 </select>
               </div>
-              <div>
-                <label htmlFor="atencionOatc" className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tipo de atención</label>
-                <select 
-                  id="atencionOatc" name="atencionOatc"
-                  value={atencionOatc}
-                  onChange={(e) => setAtencionOatc(e.target.value)}
-                  className="w-full px-2 py-1.5 rounded border border-slate-300 outline-none text-sm bg-white"
-                >
-                  <option value="">Seleccionar...</option>
-                  <option value="Corte">Corte, corte con diseño</option>
-                  <option value="Peinados">Cepillado, planchado, peinados</option>
-                  <option value="Color">Color</option>
-                  <option value="Alisados">Alisados, laceados y botox</option>
-                  <option value="Manos">Manos y pies</option>
-                </select>
-              </div>
+            </div>
+            
+            <div className="mb-2">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tipo de atención (Servicio)</label>
+              <CascadingServiceSelect 
+                onSelectValue={(val) => setAtencionOatc(val)} 
+                onClear={() => setAtencionOatc('')} 
+              />
+              {atencionOatc && (
+                <div className="text-[10px] text-indigo-600 font-bold mt-1.5 bg-indigo-50 inline-block px-2 py-0.5 rounded border border-indigo-100">
+                  Seleccionado: <span className="uppercase">{atencionOatc}</span>
+                </div>
+              )}
             </div>
 
             <div className="mt-auto grid grid-cols-4 gap-1.5 pt-2">
