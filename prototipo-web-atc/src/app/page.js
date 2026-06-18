@@ -109,19 +109,24 @@ export default function ReceptionDashboard() {
   const getLimaTime = () => new Date().toLocaleTimeString('en-US', { timeZone: 'America/Lima', hour12: true, hour: 'numeric', minute: '2-digit' }).toLowerCase();
 
   const handleAction = async (actionName) => {
-    if (!agenteAsistencia) {
-      Swal.fire('Atención', 'Por favor selecciona un agente primero.', 'warning');
-      return;
-    }
-
-    const agente = agentes.find(a => a.nombre_completo === agenteAsistencia || a.apodo === agenteAsistencia);
-    if (!agente) {
-      Swal.fire('Error', 'Agente no encontrado en la base de datos.', 'error');
-      return;
-    }
-
     const nowIso = new Date().toISOString();
-    const asistenciaActual = asistencias.find(a => a.agente_id === agente.id);
+    const ingresoActions = ['Registrar Entrada', 'Registrar Salida', 'Refrigerio', 'Psicólogo', 'Pasar la voz', 'Salió del salón', 'Pasar a otro salón'];
+    
+    let agente = null;
+    let asistenciaActual = null;
+
+    if (ingresoActions.includes(actionName)) {
+      if (!agenteAsistencia) {
+        Swal.fire('Atención', 'Por favor selecciona un agente primero en el panel de Ingreso.', 'warning');
+        return;
+      }
+      agente = agentes.find(a => a.nombre_completo === agenteAsistencia || a.apodo === agenteAsistencia);
+      if (!agente) {
+        Swal.fire('Error', 'Agente no encontrado en la base de datos.', 'error');
+        return;
+      }
+      asistenciaActual = asistencias.find(a => a.agente_id === agente.id);
+    }
 
     try {
       if (actionName === 'Registrar Entrada') {
@@ -357,7 +362,7 @@ export default function ReceptionDashboard() {
       
       {/* 
         Grid Principal: 2 columnas superiores (Formularios) y 2 inferiores (Tablas). 
-        Todo muy compacto (gap-2) para aprovechar la "pizarra" 
+      */}
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-2 max-w-[1600px] mx-auto">
         
         {/* PANEL: CONTROL DE INGRESO */}
