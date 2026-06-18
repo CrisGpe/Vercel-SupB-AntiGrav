@@ -69,7 +69,7 @@ export default function ReceptionDashboard() {
       ] = await Promise.all([
         supabase.from('agentes').select('*'),
         supabase.from('control_asistencia').select('*').gte('created_at', startOfDay).lte('created_at', endOfDay),
-        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).order('correlativo', { ascending: false }),
+        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).is('resuelto_at', null).order('correlativo', { ascending: false }),
         supabase.from('clientes').select('id, nombre, apellido, dni')
       ]);
 
@@ -297,7 +297,7 @@ export default function ReceptionDashboard() {
       const endOfDay = `${fechaLima}T23:59:59-05:00`;
       const [ { data: newAsist }, { data: newOatcs } ] = await Promise.all([
         supabase.from('control_asistencia').select('*').gte('created_at', startOfDay).lte('created_at', endOfDay),
-        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).order('correlativo', { ascending: false })
+        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).is('resuelto_at', null).order('correlativo', { ascending: false })
       ]);
       if (newAsist) setAsistencias(newAsist);
       if (newOatcs) {
@@ -309,6 +309,53 @@ export default function ReceptionDashboard() {
       Swal.fire('Error', 'Fallo al finalizar el ticket de venta', 'error');
     }
   };
+  const handleResolverOATC = async (oatcId, agenteId) => {
+    const result = await Swal.fire({
+      title: '¿Resolver Orden?',
+      text: "El servicio se enviará a Caja y el agente volverá a estar Disponible.",
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#10b981',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sí, resolver'
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+      const nowIso = new Date().toISOString();
+      
+      // 1. Marcar OATC como resuelta
+      const { error: oatcErr } = await supabase.from('oatc').update({ resuelto_at: nowIso }).eq('id', oatcId);
+      if (oatcErr) throw oatcErr;
+
+      // 2. Liberar agente
+      if (agenteId) {
+        const asis = asistencias.find(a => a.agente_id === agenteId);
+        if (asis) {
+          await supabase.from('control_asistencia').update({ estado_texto: 'Disponible', ultima_act: nowIso }).eq('id', asis.id);
+        }
+      }
+
+      Swal.fire('Resuelto', 'Orden enviada a caja exitosamente.', 'success');
+      
+      // 3. Recargar
+      const fechaLima = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+      const startOfDay = `${fechaLima}T00:00:00-05:00`;
+      const endOfDay = `${fechaLima}T23:59:59-05:00`;
+      const [ { data: newAsist }, { data: newOatcs } ] = await Promise.all([
+        supabase.from('control_asistencia').select('*').gte('created_at', startOfDay).lte('created_at', endOfDay),
+        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).is('resuelto_at', null).order('correlativo', { ascending: false })
+      ]);
+      if (newAsist) setAsistencias(newAsist);
+      if (newOatcs) {
+        setOatcs(newOatcs);
+      }
+    } catch (e) {
+      console.error(e);
+      Swal.fire('Error', 'Fallo al resolver orden', 'error');
+    }
+  };
+
 
   const handleDeleteOATC = async (id) => {
     const result = await Swal.fire({
@@ -377,7 +424,7 @@ export default function ReceptionDashboard() {
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-sky-500 outline-none transition-all" 
               >
                 <option value="">Seleccionar agente...</option>
-                {agentes.map(a => <option key={a.id} value={a.nombre_completo || a.apodo}>{a.nombre_completo || a.apodo}</option>)}
+                {agentes.map(a => <option key={a.id} value={a.apodo || a.nombre_completo}>{a.apodo || a.nombre_completo}</option>)}
               </select>
             </div>
 
@@ -446,7 +493,7 @@ export default function ReceptionDashboard() {
                   className="w-full px-2 py-1.5 rounded border border-slate-300 focus:border-indigo-500 outline-none text-sm"
                 >
                   <option value="">Seleccionar agente...</option>
-                  {agentes.map(a => <option key={a.id} value={a.nombre_completo || a.apodo}>{a.nombre_completo || a.apodo}</option>)}
+                  {agentes.map(a => <option key={a.id} value={a.apodo || a.nombre_completo}>{a.apodo || a.nombre_completo}</option>)}
                 </select>
               </div>
               <div className="relative">
@@ -569,7 +616,7 @@ export default function ReceptionDashboard() {
                         {o.tipo_oatc === 'Venta de Producto' ? (
                           <button onClick={() => setPosOatc(o)} className="px-2 py-1 bg-purple-500 text-white rounded text-[10px] font-bold hover:bg-purple-600">Generar Ticket</button>
                         ) : (
-                          <button onClick={() => handleAction('Resolver OATC')} className="px-2 py-1 bg-emerald-500 text-white rounded text-[10px] font-bold hover:bg-emerald-600">Resolver</button>
+                          <button onClick={() => handleResolverOATC(o.id, o.agente_id)} className="px-2 py-1 bg-emerald-500 text-white rounded text-[10px] font-bold hover:bg-emerald-600">Resolver</button>
                         )}
                         <button onClick={() => handleDeleteOATC(o.id)} className="px-2 py-1 bg-red-500 text-white rounded text-[10px] font-bold hover:bg-red-600 flex items-center justify-center" title="Eliminar Orden">
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
