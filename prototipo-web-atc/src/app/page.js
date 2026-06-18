@@ -358,11 +358,10 @@ export default function ReceptionDashboard() {
       {/* 
         Grid Principal: 2 columnas superiores (Formularios) y 2 inferiores (Tablas). 
         Todo muy compacto (gap-2) para aprovechar la "pizarra" 
-      */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 max-w-[1600px] mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-10 gap-2 max-w-[1600px] mx-auto">
         
         {/* PANEL: CONTROL DE INGRESO */}
-        <div className="bg-white rounded shadow-sm border border-slate-200 flex flex-col">
+        <div className="bg-white rounded shadow-sm border border-slate-200 flex flex-col lg:col-span-5">
           <div className="bg-slate-800 text-white px-3 py-1.5 flex justify-between items-center rounded-t">
             <h2 className="text-sm font-bold m-0 uppercase tracking-wide">Ingreso</h2>
           </div>
@@ -396,7 +395,7 @@ export default function ReceptionDashboard() {
         </div>
 
         {/* PANEL: ÓRDENES DE ATENCIÓN */}
-        <div className="bg-white rounded shadow-sm border border-slate-200 flex flex-col">
+        <div className="bg-white rounded shadow-sm border border-slate-200 flex flex-col lg:col-span-5">
           <div className="bg-slate-800 text-white px-3 py-1.5 flex justify-between items-center rounded-t">
             <h2 className="text-sm font-bold m-0 uppercase tracking-wide">Órdenes de atención</h2>
             <div className="flex gap-3 text-xs font-mono bg-slate-700 px-2 py-0.5 rounded">
@@ -476,7 +475,7 @@ export default function ReceptionDashboard() {
         </div>
 
         {/* TABLA: DISPONIBILIDAD Y TURNOS */}
-        <div className="bg-white rounded shadow-sm border border-slate-200 overflow-hidden lg:col-span-1">
+        <div className="bg-white rounded shadow-sm border border-slate-200 overflow-hidden lg:col-span-3">
           <div className="bg-slate-800 text-white px-3 py-1.5 border-b border-slate-200">
             <h2 className="text-sm font-bold m-0 uppercase tracking-wide">Disponibilidad y Turnos</h2>
           </div>
@@ -518,7 +517,7 @@ export default function ReceptionDashboard() {
                     <tr key={asist.id} className="hover:bg-indigo-50 transition-colors cursor-pointer group" onClick={() => openAgentModal(a, asist)}>
                       <td className="px-2 py-2 text-center font-mono font-bold text-indigo-600">-</td>
                       <td className="px-2 py-2 text-center font-mono font-bold text-sky-600">-</td>
-                      <td className="px-2 py-2 font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{a.nombre_completo || a.apodo}</td>
+                      <td className="px-2 py-2 font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{a.apodo || a.nombre_completo}</td>
                       <td className="px-2 py-2">
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${asist.estado_texto === 'Disponible' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'}`}>
                           {asist.estado_texto}
@@ -539,7 +538,7 @@ export default function ReceptionDashboard() {
         </div>
 
         {/* TABLA: LISTADO DE ATENCIÓN */}
-        <div className="bg-white rounded shadow-sm border border-slate-200 overflow-hidden lg:col-span-1">
+        <div className="bg-white rounded shadow-sm border border-slate-200 overflow-hidden lg:col-span-7">
           <div className="bg-slate-800 text-white px-3 py-1.5 border-b border-slate-200">
             <h2 className="text-sm font-bold m-0 uppercase tracking-wide">Listado de Atención</h2>
           </div>
