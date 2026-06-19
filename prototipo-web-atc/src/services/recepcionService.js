@@ -61,9 +61,10 @@ export const recepcionService = {
     if (error) throw error;
     
     if (asistenciaId && nuevoEstadoAgente) {
-      await supabase.from('control_asistencia').update({ 
+      const { error: asisErr } = await supabase.from('control_asistencia').update({ 
         estado_texto: nuevoEstadoAgente, ultima_act: nowIso 
       }).eq('id', asistenciaId);
+      if (asisErr) throw asisErr;
     }
   },
 
@@ -77,9 +78,10 @@ export const recepcionService = {
     if (oatcErr) throw oatcErr;
 
     if (asistenciaId) {
-      await supabase.from('control_asistencia').update({ 
+      const { error: asisErr } = await supabase.from('control_asistencia').update({ 
         estado_texto: 'Disponible', ultima_act: nowIso 
       }).eq('id', asistenciaId);
+      if (asisErr) throw asisErr;
     }
   },
 
@@ -89,9 +91,10 @@ export const recepcionService = {
 
     // Liberar agente si estaba asignado a esta orden
     if (asistenciaId) {
-      await supabase.from('control_asistencia').update({ 
+      const { error: asisErr } = await supabase.from('control_asistencia').update({ 
         estado_texto: 'Disponible', ultima_act: nowIso 
       }).eq('id', asistenciaId);
+      if (asisErr) throw asisErr;
     }
   }
 };
