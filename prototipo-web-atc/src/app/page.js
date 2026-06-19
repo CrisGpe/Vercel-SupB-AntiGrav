@@ -69,7 +69,7 @@ export default function ReceptionDashboard() {
       ] = await Promise.all([
         supabase.from('agentes').select('*'),
         supabase.from('control_asistencia').select('*').gte('created_at', startOfDay).lte('created_at', endOfDay),
-        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).is('resuelto_at', null).order('correlativo', { ascending: false }),
+        supabase.from('oatc').select('*, agentes(nombre_completo, apodo, especialidad), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).is('resuelto_at', null).order('correlativo', { ascending: false }),
         supabase.from('clientes').select('id, nombre, apellido, dni')
       ]);
 
@@ -297,7 +297,7 @@ export default function ReceptionDashboard() {
       const endOfDay = `${fechaLima}T23:59:59-05:00`;
       const [ { data: newAsist }, { data: newOatcs } ] = await Promise.all([
         supabase.from('control_asistencia').select('*').gte('created_at', startOfDay).lte('created_at', endOfDay),
-        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).is('resuelto_at', null).order('correlativo', { ascending: false })
+        supabase.from('oatc').select('*, agentes(nombre_completo, apodo, especialidad), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).is('resuelto_at', null).order('correlativo', { ascending: false })
       ]);
       if (newAsist) setAsistencias(newAsist);
       if (newOatcs) {
@@ -344,7 +344,7 @@ export default function ReceptionDashboard() {
       const endOfDay = `${fechaLima}T23:59:59-05:00`;
       const [ { data: newAsist }, { data: newOatcs } ] = await Promise.all([
         supabase.from('control_asistencia').select('*').gte('created_at', startOfDay).lte('created_at', endOfDay),
-        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).is('resuelto_at', null).order('correlativo', { ascending: false })
+        supabase.from('oatc').select('*, agentes(nombre_completo, apodo, especialidad), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).is('resuelto_at', null).order('correlativo', { ascending: false })
       ]);
       if (newAsist) setAsistencias(newAsist);
       if (newOatcs) {
@@ -558,7 +558,10 @@ export default function ReceptionDashboard() {
                     <tr key={asist.id} className="hover:bg-indigo-50 transition-colors cursor-pointer group" onClick={() => openAgentModal(a, asist)}>
                       <td className="px-2 py-2 text-center font-mono font-bold text-indigo-600">-</td>
                       <td className="px-2 py-2 text-center font-mono font-bold text-sky-600">-</td>
-                      <td className="px-2 py-2 font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{a.apodo || a.nombre_completo}</td>
+                      <td className="px-2 py-2 group-hover:text-indigo-600 transition-colors">
+                        <div className="font-bold text-slate-800">{a.apodo || a.nombre_completo}</div>
+                        {a.especialidad && <div className="text-[9px] text-slate-500 font-medium uppercase tracking-tight leading-none mt-0.5">{a.especialidad}</div>}
+                      </td>
                       <td className="px-2 py-2">
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${asist.estado_texto === 'Disponible' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'}`}>
                           {asist.estado_texto}
@@ -608,8 +611,9 @@ export default function ReceptionDashboard() {
                         {o.categoria_demanda}
                       </span>
                     </td>
-                    <td className="px-2 py-2 text-slate-600">
-                      {o.agentes ? (o.agentes.nombre_completo || o.agentes.apodo) : '--'}
+                    <td className="px-2 py-2">
+                      <div className="text-slate-600 font-bold">{o.agentes ? (o.agentes.apodo || o.agentes.nombre_completo) : '--'}</div>
+                      {o.agentes?.especialidad && <div className="text-[9px] text-slate-400 font-medium uppercase tracking-tight leading-none mt-0.5">{o.agentes.especialidad}</div>}
                     </td>
                     <td className="px-2 py-2 text-center">
                       <div className="flex justify-center gap-1">

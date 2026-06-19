@@ -45,8 +45,8 @@ export default function CajaDashboard() {
       const startOfDay = `${fechaLima}T00:00:00-05:00`;
       
       const [ { data: oatcs }, { data: retails } ] = await Promise.all([
-        supabase.from('oatc').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido)').not('resuelto_at', 'is', null).eq('estado_caja', 'Pendiente').order('resuelto_at', { ascending: true }),
-        supabase.from('ventas_retail').select('*, agentes(nombre_completo, apodo), clientes(nombre, apellido), ventas_retail_items(*, catalogo(nombre))').eq('estado', 'Pendiente de Pago').order('fecha', { ascending: true })
+        supabase.from('oatc').select('*, agentes(nombre_completo, apodo, especialidad), clientes(nombre, apellido)').not('resuelto_at', 'is', null).eq('estado_caja', 'Pendiente').order('resuelto_at', { ascending: true }),
+        supabase.from('ventas_retail').select('*, agentes(nombre_completo, apodo, especialidad), clientes(nombre, apellido), ventas_retail_items(*, catalogo(nombre))').eq('estado', 'Pendiente de Pago').order('fecha', { ascending: true })
       ]);
 
       setPendingOatcs(oatcs || []);
