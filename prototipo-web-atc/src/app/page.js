@@ -62,9 +62,7 @@ export default function RecepcionDashboard() {
           oatcs={oatcs.filter(o => o.resuelto_at !== null)} 
           openAgentModal={openAgentModal}
         />
-      </div>
 
-      <div className="grid grid-cols-1 gap-2 mt-2">
         {/* TABLA: LISTADO DE ATENCIÓN */}
         <TablaAtencion 
           oatcs={oatcs.filter(o => o.resuelto_at === null)}
@@ -73,7 +71,6 @@ export default function RecepcionDashboard() {
           handleComenzarAtencion={handleComenzarAtencion}
           handleDeleteOATC={handleDeleteOATC}
         />
-
       </div>
 
       {/* MODAL DETALLE DE AGENTE */}
