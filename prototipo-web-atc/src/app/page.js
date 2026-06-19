@@ -401,6 +401,12 @@ export default function ReceptionDashboard() {
     return <div className="flex h-screen items-center justify-center bg-slate-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500"></div></div>;
   }
 
+  // Only agents who clocked in today and are not 'Ausente'
+  const agentesDisponiblesParaOatc = agentes.filter(a => {
+    const asis = asistencias.find(as => as.agente_id === a.id);
+    return asis && asis.estado_texto !== 'Ausente';
+  });
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 p-2 font-sans">
       
@@ -493,7 +499,7 @@ export default function ReceptionDashboard() {
                   className="w-full px-2 py-1.5 rounded border border-slate-300 focus:border-indigo-500 outline-none text-sm"
                 >
                   <option value="">Seleccionar agente...</option>
-                  {agentes.map(a => <option key={a.id} value={a.apodo || a.nombre_completo}>{a.apodo || a.nombre_completo}</option>)}
+                  {agentesDisponiblesParaOatc.map(a => <option key={a.id} value={a.apodo || a.nombre_completo}>{a.apodo || a.nombre_completo}</option>)}
                 </select>
               </div>
               <div className="relative">
