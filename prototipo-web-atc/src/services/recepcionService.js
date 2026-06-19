@@ -62,10 +62,18 @@ export const recepcionService = {
     
     if (asistenciaId && nuevoEstadoAgente) {
       const { error: asisErr } = await supabase.from('control_asistencia').update({ 
-        estado_texto: nuevoEstadoAgente, ultima_act: nowIso 
+        estado_texto: nuevoEstadoAgente
+        // No actualizamos ultima_act cuando pasa a Asesorando para mantener su prioridad en cola
       }).eq('id', asistenciaId);
       if (asisErr) throw asisErr;
     }
+  },
+
+  iniciarAtencionOATC: async (asistenciaId, nowIso) => {
+    const { error } = await supabase.from('control_asistencia').update({
+      estado_texto: 'Trabajando', ultima_act: nowIso
+    }).eq('id', asistenciaId);
+    if (error) throw error;
   },
 
   crearVentaProducto: async (payload) => {

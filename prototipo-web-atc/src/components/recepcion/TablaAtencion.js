@@ -1,4 +1,4 @@
-export default function TablaAtencion({ oatcs, handleResolverOATC, handleDeleteOATC }) {
+export default function TablaAtencion({ oatcs, asistencias, handleResolverOATC, handleComenzarAtencion, handleDeleteOATC }) {
   return (
     <div className="bg-white rounded shadow-sm border border-slate-200 overflow-hidden lg:col-span-7">
       <div className="bg-slate-800 text-white px-3 py-1.5 border-b border-slate-200">
@@ -17,7 +17,11 @@ export default function TablaAtencion({ oatcs, handleResolverOATC, handleDeleteO
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {oatcs.length > 0 ? oatcs.map(o => (
+            {oatcs.length > 0 ? oatcs.map(o => {
+              const asis = asistencias?.find(a => a.agente_id === o.agente_id);
+              const estadoAsis = asis ? asis.estado_texto : null;
+              
+              return (
               <tr key={o.id} className="hover:bg-slate-50 transition-colors">
                 <td className="px-2 py-2 font-bold text-slate-800">{o.correlativo}</td>
                 <td className="px-2 py-2 text-slate-500 font-mono">
@@ -37,12 +41,21 @@ export default function TablaAtencion({ oatcs, handleResolverOATC, handleDeleteO
                 </td>
                 <td className="px-2 py-2 text-center">
                   <div className="flex justify-center gap-1">
-                    <button 
-                      onClick={() => handleResolverOATC(o.id, o.agente_id)} 
-                      className="px-2 py-1 bg-emerald-500 text-white rounded font-bold text-[10px] hover:bg-emerald-600 transition-colors shadow-sm"
-                    >
-                      Resolver
-                    </button>
+                    {estadoAsis === 'Asesorando' ? (
+                      <button 
+                        onClick={() => handleComenzarAtencion(o.id, o.agente_id)} 
+                        className="px-2 py-1 bg-amber-500 text-white rounded font-bold text-[10px] hover:bg-amber-600 transition-colors shadow-sm"
+                      >
+                        Atender
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handleResolverOATC(o.id, o.agente_id)} 
+                        className="px-2 py-1 bg-emerald-500 text-white rounded font-bold text-[10px] hover:bg-emerald-600 transition-colors shadow-sm"
+                      >
+                        Resolver
+                      </button>
+                    )}
                     <button 
                       onClick={() => handleDeleteOATC(o.id, o.agente_id)}
                       className="px-2 py-1 bg-red-500 text-white rounded font-bold text-[10px] hover:bg-red-600 transition-colors shadow-sm"
@@ -54,7 +67,7 @@ export default function TablaAtencion({ oatcs, handleResolverOATC, handleDeleteO
                   </div>
                 </td>
               </tr>
-            )) : (
+            )}) : (
               <tr><td colSpan="6" className="text-center py-8 text-slate-400 font-medium">No hay órdenes activas en este momento</td></tr>
             )}
           </tbody>

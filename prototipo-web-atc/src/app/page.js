@@ -15,7 +15,7 @@ export default function RecepcionDashboard() {
     agenteOatc, setAgenteOatc,
     atencionOatc, setAtencionOatc,
     selectedAgentData, showAgentModal, setShowAgentModal,
-    handleAction, handleResolverOATC, handleDeleteOATC, openAgentModal
+    handleAction, handleResolverOATC, handleComenzarAtencion, handleDeleteOATC, openAgentModal
   } = useRecepcion();
 
   if (loading) {
@@ -65,7 +65,9 @@ export default function RecepcionDashboard() {
         {/* TABLA: LISTADO DE ATENCIÓN */}
         <TablaAtencion 
           oatcs={oatcs}
+          asistencias={asistencias}
           handleResolverOATC={handleResolverOATC}
+          handleComenzarAtencion={handleComenzarAtencion}
           handleDeleteOATC={handleDeleteOATC}
         />
 

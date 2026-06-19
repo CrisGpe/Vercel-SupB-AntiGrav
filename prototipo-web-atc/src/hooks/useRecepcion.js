@@ -147,7 +147,8 @@ export function useRecepcion() {
         };
 
         const asis = asistencias.find(as => as.agente_id === agenteOatcObj.id);
-        const nuevoEstado = demandaOatc.toLowerCase() === 'correccion' ? 'Asesorando' : 'Trabajando';
+        // El agente siempre pasa a 'Asesorando' inicialmente, sin importar la demanda (excepto producto)
+        const nuevoEstado = demandaOatc.toLowerCase() === 'producto' ? null : 'Asesorando';
         
         await recepcionService.crearOatc(payload, asis?.id, nuevoEstado, nowIso);
         
@@ -207,6 +208,19 @@ export function useRecepcion() {
     }
   };
 
+  const handleComenzarAtencion = async (oatcId, agenteId) => {
+    try {
+      const nowIso = new Date().toISOString();
+      const asis = asistencias.find(a => a.agente_id === agenteId);
+      
+      await recepcionService.iniciarAtencionOATC(asis?.id, nowIso);
+      fetchData();
+    } catch (e) {
+      console.error(e);
+      Swal.fire('Error', 'Ocurrió un error al comenzar la atención.', 'error');
+    }
+  };
+
   const handleDeleteOATC = async (oatcId, agenteId) => {
     const result = await Swal.fire({
       title: '¿Eliminar Orden?',
@@ -249,6 +263,6 @@ export function useRecepcion() {
     agenteOatc, setAgenteOatc,
     atencionOatc, setAtencionOatc,
     selectedAgentData, showAgentModal, setShowAgentModal,
-    handleAction, handleResolverOATC, handleDeleteOATC, openAgentModal
+    handleAction, handleResolverOATC, handleComenzarAtencion, handleDeleteOATC, openAgentModal
   };
 }
