@@ -207,6 +207,31 @@ export function useRecepcion() {
     }
   };
 
+  const handleDeleteOATC = async (oatcId, agenteId) => {
+    const result = await Swal.fire({
+      title: '¿Eliminar Orden?',
+      text: "Esta acción no se puede deshacer.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sí, eliminar'
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+      const nowIso = new Date().toISOString();
+      const asis = asistencias.find(a => a.agente_id === agenteId);
+      
+      await recepcionService.eliminarOatc(oatcId, asis?.id, nowIso);
+      Swal.fire('Eliminada', 'La orden ha sido eliminada.', 'success');
+      fetchData();
+    } catch (e) {
+      console.error(e);
+      Swal.fire('Error', 'Ocurrió un error al eliminar la orden.', 'error');
+    }
+  };
+
   const openAgentModal = (agente, asistencia) => {
     const agentOatcs = oatcs.filter(o => o.agente_id === agente.id);
     const qClientes = agentOatcs.filter(o => ['cliente', 'correccion', 'producto'].includes(o.categoria_demanda?.toLowerCase())).length;
@@ -224,6 +249,6 @@ export function useRecepcion() {
     agenteOatc, setAgenteOatc,
     atencionOatc, setAtencionOatc,
     selectedAgentData, showAgentModal, setShowAgentModal,
-    handleAction, handleResolverOATC, openAgentModal
+    handleAction, handleResolverOATC, handleDeleteOATC, openAgentModal
   };
 }

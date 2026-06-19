@@ -81,5 +81,17 @@ export const recepcionService = {
         estado_texto: 'Disponible', ultima_act: nowIso 
       }).eq('id', asistenciaId);
     }
+  },
+
+  eliminarOatc: async (oatcId, asistenciaId, nowIso) => {
+    const { error: oatcErr } = await supabase.from('oatc').delete().eq('id', oatcId);
+    if (oatcErr) throw oatcErr;
+
+    // Liberar agente si estaba asignado a esta orden
+    if (asistenciaId) {
+      await supabase.from('control_asistencia').update({ 
+        estado_texto: 'Disponible', ultima_act: nowIso 
+      }).eq('id', asistenciaId);
+    }
   }
 };
