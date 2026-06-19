@@ -204,6 +204,13 @@ export default function ReceptionDashboard() {
         const { error } = await supabase.from('oatc').insert(payload);
         if (error) throw error;
         
+        // Cambiar estado del agente
+        const asis = asistencias.find(as => as.agente_id === agenteOatcObj.id);
+        if (asis) {
+          const nuevoEstado = demandaOatc.toLowerCase() === 'correccion' ? 'Asesorando' : 'Trabajando';
+          await supabase.from('control_asistencia').update({ estado_texto: nuevoEstado, ultima_act: nowIso }).eq('id', asis.id);
+        }
+
         Swal.fire('¡Éxito!', `OATC N° ${nextOatcNumber} registrada.`, 'success');
         setClienteOatc(''); setDemandaOatc(''); setAgenteOatc(''); setAtencionOatc('');
       }
