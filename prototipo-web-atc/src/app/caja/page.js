@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Swal from 'sweetalert2';
-import Navbar from '@/components/Navbar';
+
 
 export default function CajaDashboard() {
   const router = useRouter();
@@ -157,8 +157,6 @@ export default function CajaDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
-      <Navbar currentModule="Caja" />
-      
       <main className="flex-1 p-4 max-w-[1600px] w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4">
         
         {/* PANEL IZQUIERDO: Cuentas por Cobrar */}
