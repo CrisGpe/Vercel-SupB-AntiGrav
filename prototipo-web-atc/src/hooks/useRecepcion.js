@@ -247,9 +247,9 @@ export function useRecepcion() {
   };
 
   const openAgentModal = (agente, asistencia) => {
-    const agentOatcs = oatcs.filter(o => o.agente_id === agente.id);
-    const qClientes = agentOatcs.filter(o => ['cliente', 'correccion', 'producto'].includes(o.categoria_demanda?.toLowerCase())).length;
-    const qTurnos = agentOatcs.filter(o => ['turno', 'turno_nino', 'turno_caballero'].includes(o.categoria_demanda?.toLowerCase())).length;
+    const agentOatcsResolved = oatcs.filter(o => o.agente_id === agente.id && o.resuelto_at !== null);
+    const qClientes = agentOatcsResolved.filter(o => ['cliente', 'correccion', 'producto'].includes(o.categoria_demanda?.toLowerCase())).length;
+    const qTurnos = agentOatcsResolved.filter(o => ['turno', 'turno_nino', 'turno_caballero'].includes(o.categoria_demanda?.toLowerCase())).length;
     
     setSelectedAgentData({ ...agente, asistencia, qClientes, qTurnos });
     setShowAgentModal(true);

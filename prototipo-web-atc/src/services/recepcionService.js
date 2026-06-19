@@ -10,7 +10,7 @@ export const recepcionService = {
     ] = await Promise.all([
       supabase.from('agentes').select('*'),
       supabase.from('control_asistencia').select('*').gte('created_at', startOfDay).lte('created_at', endOfDay),
-      supabase.from('oatc').select('*, agentes(nombre_completo, apodo, especialidad), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).is('resuelto_at', null).order('correlativo', { ascending: false }),
+      supabase.from('oatc').select('*, agentes(nombre_completo, apodo, especialidad), clientes(nombre, apellido)').gte('creado_at', startOfDay).lte('creado_at', endOfDay).order('correlativo', { ascending: false }),
       supabase.from('clientes').select('id, nombre, apellido, dni')
     ]);
 
@@ -97,10 +97,10 @@ export const recepcionService = {
     const { error: oatcErr } = await supabase.from('oatc').delete().eq('id', oatcId);
     if (oatcErr) throw oatcErr;
 
-    // Liberar agente si estaba asignado a esta orden
+    // Liberar agente si estaba asignado a esta orden (sin tocar ultima_act para que mantenga su lugar)
     if (asistenciaId) {
       const { error: asisErr } = await supabase.from('control_asistencia').update({ 
-        estado_texto: 'Disponible', ultima_act: nowIso 
+        estado_texto: 'Disponible'
       }).eq('id', asistenciaId);
       if (asisErr) throw asisErr;
     }

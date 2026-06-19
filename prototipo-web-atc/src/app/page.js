@@ -55,16 +55,26 @@ export default function RecepcionDashboard() {
           handleAction={handleAction}
         />
 
-        {/* TABLA: DISPONIBILIDAD Y TURNOS */}
-        <TablaDisponibilidad 
-          asistencias={asistencias}
-          agentes={agentes}
-          openAgentModal={openAgentModal}
-        />
+        {/* PANEL: AGENTES */}
+        <div className="bg-white rounded shadow-sm border border-slate-200 overflow-hidden lg:col-span-5 h-full flex flex-col">
+          <div className="bg-slate-800 text-white px-3 py-1.5 border-b border-slate-200">
+            <h2 className="text-sm font-bold m-0 uppercase tracking-wide">Disponibilidad y Turnos</h2>
+          </div>
+          <div className="flex-1 overflow-x-auto">
+            <TablaDisponibilidad 
+              asistencias={asistencias} 
+              agentes={agentes} 
+              oatcs={oatcs.filter(o => o.resuelto_at !== null)} 
+              openAgentModal={openAgentModal}
+            />
+          </div>
+        </div>
+      </div>
 
+      <div className="grid grid-cols-1 gap-2 mt-2">
         {/* TABLA: LISTADO DE ATENCIÓN */}
         <TablaAtencion 
-          oatcs={oatcs}
+          oatcs={oatcs.filter(o => o.resuelto_at === null)}
           asistencias={asistencias}
           handleResolverOATC={handleResolverOATC}
           handleComenzarAtencion={handleComenzarAtencion}
