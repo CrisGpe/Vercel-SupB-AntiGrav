@@ -1,4 +1,4 @@
-export default function TablaDisponibilidad({ asistencias, agentes, openAgentModal }) {
+export default function TablaDisponibilidad({ asistencias, agentes, oatcs = [], openAgentModal }) {
   return (
     <div className="bg-white rounded shadow-sm border border-slate-200 overflow-hidden lg:col-span-3">
       <div className="bg-slate-800 text-white px-3 py-1.5 border-b border-slate-200">
@@ -37,10 +37,15 @@ export default function TablaDisponibilidad({ asistencias, agentes, openAgentMod
               .map(asist => {
               const a = agentes.find(ag => ag.id === asist.agente_id);
               if (!a) return null;
+              
+              const agentOatcs = oatcs.filter(o => o.agente_id === a.id);
+              const qCli = agentOatcs.filter(o => ['cliente', 'correccion', 'producto'].includes(o.categoria_demanda?.toLowerCase())).length;
+              const qTur = agentOatcs.filter(o => ['turno', 'turno_nino', 'turno_caballero'].includes(o.categoria_demanda?.toLowerCase())).length;
+              
               return (
                 <tr key={asist.id} className="hover:bg-indigo-50 transition-colors cursor-pointer group" onClick={() => openAgentModal(a, asist)}>
-                  <td className="px-2 py-2 text-center font-mono font-bold text-indigo-600">-</td>
-                  <td className="px-2 py-2 text-center font-mono font-bold text-sky-600">-</td>
+                  <td className="px-2 py-2 text-center font-mono font-bold text-indigo-600">{qCli > 0 ? qCli : '-'}</td>
+                  <td className="px-2 py-2 text-center font-mono font-bold text-sky-600">{qTur > 0 ? qTur : '-'}</td>
                   <td className="px-2 py-2 group-hover:text-indigo-600 transition-colors">
                     <div className="font-bold text-slate-800">{a.apodo || a.nombre_completo}</div>
                     {a.especialidad && <div className="text-[9px] text-slate-500 font-medium uppercase tracking-tight leading-none mt-0.5">{a.especialidad}</div>}
